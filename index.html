@@ -6,6 +6,7 @@
 <title>Sentinel Globe v2 — Public Telemetry Command Center</title>
 <link rel="stylesheet" href="maplibre-gl.css">
 <script src="maplibre-gl.js"></script>
+<script src="satellite.min.js"></script>
 <style>
 /* ============ SENTINEL GLOBE v2 — viridian command center ============
    3 files: index.html + vendored maplibre-gl.js/.css (pinned v5.24, ODbL/OSM basemap).
@@ -22,8 +23,9 @@ body.focus #app{grid-template-columns:0 1fr 0;grid-template-rows:52px 1fr 0}
 body.focus #left,body.focus #right,body.focus #bottom{display:none}
 html,body{height:100%;overflow:hidden}
 body{background:var(--bg);color:var(--txt);font:14px/1.45 -apple-system,'Segoe UI',Roboto,Inter,sans-serif}
-#app{display:grid;height:100vh;grid-template-rows:52px 1fr 230px;grid-template-columns:290px 1fr 330px;
-  grid-template-areas:"hdr hdr hdr" "left map right" "bottom bottom bottom"}
+#app{display:grid;height:100vh;grid-template-rows:52px 26px 1fr 230px;grid-template-columns:290px 1fr 330px;
+  grid-template-areas:"hdr hdr hdr" "feeds feeds feeds" "left map right" "bottom bottom bottom"}
+body.focus #app{grid-template-rows:52px 0 1fr 0}
 /* ---------- header ---------- */
 header{grid-area:hdr;display:flex;align-items:center;gap:12px;padding:0 14px;
   background:linear-gradient(180deg,#12241d,#0c1714);border-bottom:1px solid var(--line)}
@@ -123,10 +125,32 @@ th{color:var(--vir2);font-size:9.5px;letter-spacing:1px;text-transform:uppercase
   border-radius:10px!important;font:12px/1.5 inherit!important;padding:10px 12px!important;font-family:var(--mono)}
 .maplibregl-popup-tip{border-top-color:var(--vir)!important}
 #bmRow{display:flex;gap:5px;margin:2px 0 8px}
+#feedBar{grid-area:feeds;display:flex;gap:5px;flex-wrap:wrap;align-items:center;padding:3px 10px;
+  background:#04120c;border-bottom:1px solid #12261e;min-height:24px}
+.fchip{display:inline-flex;gap:5px;align-items:center;font-size:10px;color:#9fb8ae;background:#0a1a14;
+  border:1px solid #163026;border-radius:10px;padding:2px 8px;cursor:pointer;user-select:none}
+.fchip:hover{border-color:#3a6a58}
+.fdot{width:7px;height:7px;border-radius:50%;background:#4a5a53;flex:none}
+.fchip.ok .fdot{background:#5fbf9f}
+.fchip.fail .fdot{background:#d9455b}
+.fchip.off .fdot{background:#4a5a53}
+.fchip.loading .fdot{background:transparent;border:2px solid #2a4a3e;border-top-color:#7fe0bd;
+  width:8px;height:8px;animation:fspin .8s linear infinite}
+@keyframes fspin{to{transform:rotate(360deg)}}
+body.focus #feedBar{display:none}
+.satrow{display:flex;gap:6px;align-items:center;font-size:11px;color:var(--fine,#9fb8ae);padding:2px 0}
+.bkrow{display:flex;gap:6px;align-items:center;font-size:11px;padding:3px 0;cursor:pointer}
+.bkrow:hover{color:var(--vir3,#7fe0bd)}
+.bkrow .del{margin-left:auto;cursor:pointer;color:#7a5a5a}
+.bkrow .star2{color:#e0b24b}
+.prerow{display:flex;gap:6px;align-items:center;font-size:11px;padding:3px 0}
+.prerow .apply{cursor:pointer}.prerow .apply:hover{color:var(--vir3,#7fe0bd)}
+.prerow .del{margin-left:auto;cursor:pointer;color:#7a5a5a}
+.prerow .boot{cursor:pointer}.prerow .boot.on{color:#e0b24b}
 #bmRow .hbtn{flex:1;padding:5px 4px;font-size:10px}
 @media (max-width:980px){
-  #app{grid-template-columns:1fr;grid-template-rows:52px 46vh 1fr 200px;
-    grid-template-areas:"hdr" "map" "right" "bottom"}
+  #app{grid-template-columns:1fr;grid-template-rows:52px 26px 46vh 1fr 200px;
+    grid-template-areas:"hdr" "feeds" "map" "right" "bottom"}
   #left{display:none}
 }
 </style>
@@ -138,18 +162,21 @@ th{color:var(--vir2);font-size:9.5px;letter-spacing:1px;text-transform:uppercase
   <div id="searchWrap">
     <input id="searchInput" placeholder="ZIP, city, or lat,lon — e.g. 76234 or Decatur TX">
     <button class="hbtn" id="btnGo">GO</button>
+    <button class="hbtn" id="btnStar" title="Bookmark the current location">★</button>
     <button class="hbtn" id="btnHome" title="Fly to your home watch zone">⌂ HOME</button>
   </div>
   <button class="hbtn" id="btnHelp" title="What am I looking at? — explainer index">?</button>
   <button class="hbtn" id="btnNotif" title="Browser notifications for your home watch zone">🔔</button>
   <button class="hbtn" id="btnFocus" title="Hide all panels — map only (great with Ambient)">◱ FOCUS</button>
   <button class="hbtn" id="btnFullscreen" title="True fullscreen (Esc to exit)">⛶</button>
-  <button class="hbtn" id="btnAmbient" title="Slow beautiful auto-rotation — leave it running">◉ AMBIENT</button>
+  <button class="hbtn" id="btnAmbient" title="Slow beautiful auto-rotation — leave it running">◉ ORBIT</button>
   <button class="hbtn" id="btnIntegrity" title="Hide mock, experimental & low-confidence items">INTEGRITY</button>
   <button class="hbtn" id="btnMock" title="Clearly-labeled sample data for demo/testing">MOCK</button>
   <button class="hbtn" id="btnSettings">⚙</button>
   <span id="clockUtc">--:--:-- UTC</span>
 </header>
+
+<div id="feedBar" title="Live status of every data feed — click any chip"></div>
 
 <div class="panel" id="left">
   <h2>Basemap <button class="ibtn" data-info="basemap">i</button></h2>
@@ -157,8 +184,20 @@ th{color:var(--vir2);font-size:9.5px;letter-spacing:1px;text-transform:uppercase
     <button class="hbtn" data-bm="osm">Street</button><button class="hbtn" data-bm="sat">Satellite</button>
     <button class="hbtn" data-bm="topo">Terrain</button><button class="hbtn" data-bm="dark">Dark</button>
   </div>
+  <h2>Views <button class="ibtn" data-info="polar">i</button></h2>
+  <div id="bmRow">
+    <button class="hbtn" id="btnViewGlobe">🌐 Globe</button><button class="hbtn" id="btnViewPolar">🧭 Polar top-down</button>
+  </div>
   <h2>Layers <button class="ibtn" data-info="layers">i</button></h2>
   <div id="layerList"></div>
+  <h2>Satellites &amp; Debris <button class="ibtn" data-info="sats">i</button></h2>
+  <div id="satRows">
+    <label class="satrow"><input type="checkbox" data-sat="stations"> Stations (ISS etc.)</label>
+    <label class="satrow"><input type="checkbox" data-sat="weather"> Weather satellites</label>
+    <label class="satrow"><input type="checkbox" data-sat="starlink"> Starlink <span class="finer">(first 400)</span></label>
+    <label class="satrow"><input type="checkbox" data-sat="cosmos-2251-debris"> Debris: Cosmos-2251 <span class="finer">(first 400)</span></label>
+    <div class="finer" id="satNote">SGP4-propagated from CelesTrak orbits — MODELED positions from MEASURED orbits. Not a video feed; none exists publicly.</div>
+  </div>
   <h2>Radar Loop <button class="ibtn" data-info="radar">i</button></h2>
   <button class="subbtn" id="btnRadarPlay">▶ Play last 50 min</button>
   <h2>Power Infrastructure <button class="ibtn" data-info="power">i</button></h2>
@@ -167,6 +206,11 @@ th{color:var(--vir2);font-size:9.5px;letter-spacing:1px;text-transform:uppercase
   <h2>Grid Stress — All Balancing Authorities <button class="ibtn" data-info="ba">i</button></h2>
   <div class="finer" id="baNote">Needs free EIA key in ⚙ Settings. Fetches EVERY US balancing authority in one call — no picking one region.</div>
   <div id="baMini"></div>
+  <h2>Bookmarks <button class="ibtn" data-info="bookmarks">i</button></h2>
+  <div id="bkList" class="finer">None yet — search a place, then press ★</div>
+  <h2>Presets <button class="ibtn" data-info="presets">i</button></h2>
+  <div id="presetList" class="finer">None yet</div>
+  <button class="subbtn" id="btnSavePreset">＋ Save current view as preset</button>
 </div>
 
 <div id="mapWrap">
@@ -190,6 +234,8 @@ th{color:var(--vir2);font-size:9.5px;letter-spacing:1px;text-transform:uppercase
     <div class="tab" data-tab="ledger">TRUTH LEDGER <button class="ibtn" data-info="ledger">i</button></div>
     <div class="tab" data-tab="watchdog">WATCHDOG <button class="ibtn" data-info="watchdog">i</button></div>
     <div class="tab" data-tab="sources">SOURCES <button class="ibtn" data-info="sources">i</button></div>
+    <div class="tab" data-tab="registry">REGISTRY <button class="ibtn" data-info="registry">i</button></div>
+    <div class="tab" data-tab="journal">JOURNAL <button class="ibtn" data-info="journal">i</button></div>
   </div>
   <div id="tabBody"></div>
 </div>
@@ -211,10 +257,12 @@ const store={get:(k,d)=>{try{const v=localStorage.getItem("sg2_"+k);return v==nu
              set:(k,v)=>{try{localStorage.setItem("sg2_"+k,JSON.stringify(v));}catch(e){}}};
 const cfg={
   firmsKey:store.get("firmsKey",""), eiaKey:store.get("eiaKey",""), nasaKey:store.get("nasaKey","DEMO_KEY"),
+  tomtomKey:store.get("tomtomKey",""), aisKey:store.get("aisKey",""),
   home:store.get("home",{name:"Decatur, TX 76234 (default — change in ⚙)",lat:33.2343,lon:-97.5861}),
 };
 const S={loc:cfg.home, mock:false, integrity:false, ambient:false,
          quakes:[], fires:[], aircraft:[], alerts:[], donki:[], ba:{}, power:null,
+         ships:{}, sats:[], flows:[],
          kp:null, wind:null, xray:null, iss:null, issTrail:[], meteo:null, anomalies:[]};
 const haversine=(a,b,c,d)=>{const R=6371,r=x=>x*Math.PI/180;
   const h=Math.sin(r(c-a)/2)**2+Math.cos(r(a))*Math.cos(r(c))*Math.sin(r(d-b)/2)**2;
@@ -275,6 +323,19 @@ ledger:{t:"Truth Ledger",w:"An append-only log of every fetch this session: sour
 sources:{t:"Sources & Integrity",w:"The registry of every data source with its terms posture, refresh rate, and honest limitations, plus this app's standing integrity rules.",s:"Internal",f:"—",c:"—",l:"—"},
 notif:{t:"Notifications",w:"When ON, your browser notifies you even in another tab for: new official NWS alerts at your home location, quakes M4.5+ within ~300 mi of home, Kp reaching 6+ (strong geomagnetic storm), or a fire detection within ~50 mi of home. Each event notifies once (deduplicated).",s:"Rules run locally on the same public feeds",f:"Evaluated every refresh cycle",c:"mixed, per underlying source",l:"Only works while the tab is open (a PWA/service-worker version is Phase 3). Browser must grant permission. This is convenience, not a life-safety system — a NOAA weather radio does not depend on your browser."},
 modes:{t:"Header Modes",w:"AMBIENT = slow, beautiful globe auto-rotation for leaving on a wall screen; touching the map pauses it. INTEGRITY = hides anything mock, experimental, or low-confidence — only verified live data remains. MOCK = clearly-banner-labeled sample data for testing the interface. 🔔 = browser notifications for your home watch zone. ◱ FOCUS = hides every panel so the map alone fills the window. ⛶ = true fullscreen (press Esc to exit). Stack all three — Fullscreen + Focus + Ambient — for a wall display.",s:"—",f:"—",c:"—",l:"MOCK and live can never mix silently: the Watchdog flags RED if mock items appear outside Mock mode."},
+registry:{t:"Source Registry",w:"Every lawful source this app knows about — grid and earth-field — with a trust tier (1 official operational … 7 user journal) and an honest adapter status. LIVE flows into the app now; KEYED needs your free key; STUB is a reserved adapter slot; LINK means no lawful browser API exists and one click opens the official source. Labeling something LINK instead of faking a feed is the integrity rule working, not a shortcut.",s:"Compiled from your expansion specification; each row links its source",f:"Static registry, updated with app versions",c:"—",l:"A trust tier rates the SOURCE class, not any individual reading. Tier-5 mirrors (e.g. Schumann dashboards) can be right — but you cannot verify it from the mirror alone, which is exactly why they are tier 5."},
+journal:{t:"User Journal (Tier 7)",w:"Your own observations — sleep, mood, headaches, weather feel, prayer times, family notes. Stored locally, included in FULL backup, and kept strictly separate from measured data so subjective notes can never contaminate telemetry.",s:"You",f:"Whenever you write",c:"TIER 7 — subjective",l:"Any pattern you notice between journal entries and earth-field data is exploratory correlation with a sample size of one household. It is not proof, not diagnosis, and not medical guidance — and this app will never present it as such."},
+imf:{t:"IMF Bz / Bt",w:"The interplanetary magnetic field carried by the solar wind, measured at the DSCOVR spacecraft. Bt = total strength; Bz = the north-south component. When Bz points SOUTH (negative) for hours, it links up with Earth's field and lets solar-wind energy pour in — that is the main switch for geomagnetic storms. Northward Bz mostly deflects the flow.",s:"NOAA SWPC / DSCOVR at L1",f:"~1-min data, fetched every 5 min",c:"MEASURED",l:"L1 is 15–60 min upstream of Earth depending on wind speed. A single negative spike means little; duration is what matters."},
+feeds:{t:"Feed Status Bar",w:"Live state of every data source. Spinning ring = fetching now. Green dot + age = loaded, showing how old the data is. Red ✕ = last attempt failed. Gray — = off (layer disabled or key missing). Click any chip for details: the exact error, how often it polls, a ↻ Retry button, a link to view the SAME data at the official source website, and honest alternatives for feeds that fail often.",s:"Internal instrumentation of every adapter",f:"Updates the instant any fetch starts or finishes",c:"—",l:"Shows fetch health only — it cannot detect a source returning wrong-but-well-formed data (the Watchdog cross-checks handle that)."},
+faults:{t:"Fault Lines (global)",w:"13,696 mapped active faults worldwide, drawn in red. Click any fault for its name and slip type. A fault on the map means geologists have documented movement there in the geologically recent past — it is NOT a prediction that it will move soon.",s:"GEM Global Active Faults Database (research compilation, CC-BY-SA), vendored in this repo",f:"Static research dataset",c:"MEASURED",l:"Compiled from regional catalogs of varying quality; some regions are mapped in far more detail than others. Simplified to ~1 km precision for speed. Absence of a drawn fault does not mean absence of a fault."},
+flow:{t:"Power Flow Between BAs",w:"Animated lines showing electricity interchange between balancing authorities — which regions are exporting power (line flows away) and which are importing. Line thickness = megawatts. Moving dashes show direction. This is how you SEE the relationships between grid operators: ERCOT is nearly an island; the Eastern and Western interconnections trade constantly.",s:"EIA-930 interchange data (needs your free EIA key)",f:"Hourly, 1–2 h publication lag",c:"MEASURED values, MODELED line positions (region centroids)",l:"The animation represents direction, not literal electron speed. Flows under 25 MW are hidden as noise. Intra-BA flows are not public."},
+traffic:{t:"Road Traffic",w:"Live road congestion painted on the map — green flowing, orange slow, red jammed — down to individual streets when zoomed in. Free TomTom key required (⚙ Key Vault).",s:"TomTom Traffic Flow tiles",f:"Updated continuously by TomTom from GPS probe data",c:"MEASURED",l:"Free tier ≈2,500 tile loads/day — plenty for personal use, and the Watchdog notes if it stops. Relative speeds only; no vehicle counts; no historical replay on the free tier. Coverage best on paved public roads."},
+ships:{t:"Ships / AIS",w:"Live vessel positions from AIS radio broadcasts, streamed over a websocket for the area you are viewing. Click a ship for name, speed, and course. Free AISStream key required (⚙ Key Vault).",s:"aisstream.io (volunteer terrestrial AIS receivers)",f:"Continuous stream; positions seconds to minutes old",c:"MEASURED",l:"Terrestrial receivers reach ~40 nautical miles offshore — coastal and port coverage is good, open-ocean coverage is NOT (that requires paid satellite AIS). Ships can and do turn transponders off. Capped at 1,500 vessels in memory."},
+sats:{t:"Satellites & Debris",w:"Real orbital objects propagated from published orbits: space stations, weather satellites, Starlink, and cataloged debris from the 2009 Cosmos-2251 collision. Positions recompute every 8 seconds using SGP4 — the same math professionals use.",s:"CelesTrak general-perturbations data; SGP4 via satellite.js (vendored)",f:"Orbits updated by CelesTrak roughly daily; positions recomputed live",c:"MODELED positions from MEASURED orbits — accuracy is km-scale and degrades as the orbit data ages (age shown after loading)",l:"Capped at 400 objects per group so your device stays smooth; the full public catalog is ~27,000 objects. There is NO public live video feed of satellites — anything claiming to be one is an animation, including this one: these are computed positions, honestly labeled."},
+polar:{t:"Views: Globe & Polar",w:"Globe = the standard 3D Earth. Polar top-down looks straight down at the North Pole — this is exactly the perspective behind the UN emblem and azimuthal-equidistant 'flat' world maps. Seeing it generated live from a sphere is the best teaching tool for why those maps look the way they do: they are projections OF the globe, with distortion growing toward the south.",s:"—",f:"—",c:"—",l:"A true flat azimuthal-equidistant projection is not supported by this map engine; the top-down globe view gives the same visual perspective honestly. Antarctica appears at the outer edge, stretched — that is the projection distorting, not the Earth."},
+bookmarks:{t:"Bookmarks",w:"Star any searched location to save it. Click a bookmark to fly there and load its Local Brief. Included in the FULL backup export.",s:"Stored in your browser only",f:"—",c:"—",l:"—"},
+presets:{t:"Presets (profiles)",w:"Save your entire current view — layers on/off, basemap, position, zoom, Focus/Orbit/Integrity state — under a name. ▶ applies it. ✦ marks it as your STARTUP preset: the app will open exactly that way every time. Included in the FULL backup export.",s:"Stored in your browser only",f:"—",c:"—",l:"Startup preset applies after the map finishes loading (about a second)."},
+sky:{t:"Sky & Eclipse Lab",w:"A teaching panel: the current Sun–Earth–Moon geometry drawn to explain today's moon phase, why eclipses happen only when a new or full moon crosses Earth's orbital plane (the ~5° tilt is why there isn't an eclipse every month), and the table of upcoming eclipses.",s:"Phase computed locally; eclipse dates from published NASA ephemerides — verify at eclipse.gsfc.nasa.gov",f:"Live for phase; eclipse table is fixed future dates",c:"MODELED (phase) / OFFICIAL (eclipse dates)",l:"Diagram is schematic — sizes and distances are not to scale (to scale, the Moon would be 30 Earth-diameters away and invisible at this size). Star/constellation rendering is not included yet; it needs a planetarium engine (Phase 3 — d3-celestial is the open-source candidate). Meanwhile Stellarium Web (stellarium-web.org, open source) does it excellently."},
 };
 function openHelpIndex(){
   $("modal").innerHTML=`<h3>? What am I looking at — index</h3><div class="infobody">
@@ -301,7 +362,7 @@ function moonInfo(d=new Date()){
   const age=((d.getTime()-ref)/864e5)%syn, ph=age/syn;
   const names=["New Moon","Waxing Crescent","First Quarter","Waxing Gibbous","Full Moon","Waning Gibbous","Last Quarter","Waning Crescent"];
   const idx=Math.floor(((ph+1/16)%1)*8);
-  return{name:names[idx],illum:Math.round((1-Math.cos(2*Math.PI*ph))/2*100),ageDays:age.toFixed(1)};}
+  return{name:names[idx],illum:Math.round((1-Math.cos(2*Math.PI*ph))/2*100),ageDays:age.toFixed(1),phase:ph};}
 function subsolar(d=new Date()){
   const n=(d.getTime()/864e5-10957.5), L=(280.46+0.9856474*n)%360, g=(357.528+0.9856003*n)*Math.PI/180;
   const lam=(L+1.915*Math.sin(g)+0.02*Math.sin(2*g))*Math.PI/180;
@@ -333,6 +394,11 @@ async function geocode(q){
     if(r.ok){const j=await r.json();if(j.results&&j.results[0]){const g=j.results[0];
       ledger("Open-Meteo Geocoder","geocoding-api.open-meteo.com","geocoded "+q,"OK","OFFICIAL","place centroid");
       return{name:`${g.name}, ${g.admin1||""} ${g.country_code||""}`.trim(),lat:g.latitude,lon:g.longitude};}}
+    // Landmark fallback: "Mount Everest", "Statue of Liberty", "Eiffel Tower"…
+    const rn=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=jsonv2&limit=1`);
+    if(rn.ok){const jn=await rn.json();if(jn[0]){
+      ledger("Nominatim (OSM)","nominatim.openstreetmap.org","geocoded landmark "+q,"OK","OFFICIAL","OSM data; 1 req/s fair-use");
+      return{name:jn[0].display_name.split(",").slice(0,2).join(","),lat:+jn[0].lat,lon:+jn[0].lon};}}
   }catch(e){ledger("Geocoder","", "failed: "+e.message,"FAIL","UNAVAILABLE","");wd("geocode","bad",e.message);}
   return null;}
 
@@ -353,6 +419,7 @@ const style={
     dark:{type:"raster",tiles:["https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"],tileSize:256,maxzoom:19},
     satlabels:{type:"raster",tiles:["https://basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}.png"],tileSize:256,maxzoom:19},
     counties:{type:"geojson",data:"counties.geojson"}, // vendored US Census county boundaries (public domain)
+    faults:{type:"geojson",data:"faults.geojson"}, // vendored GEM Global Active Faults (CC-BY-SA research compilation)
   },
   layers:[
     {id:"bg",type:"background",paint:{"background-color":"#050a08"}},
@@ -375,6 +442,9 @@ style.layers.push(
   {id:"county-labels",type:"symbol",source:"counties",minzoom:7,
    layout:{"text-field":["get","n"],"text-size":11,"symbol-placement":"point"},
    paint:{"text-color":"#a8d8c5","text-halo-color":"#04120c","text-halo-width":1.4,"text-opacity":0.85}});
+style.layers.push(
+  {id:"fault-lines",type:"line",source:"faults",layout:{visibility:"none"},
+   paint:{"line-color":"#d9455b","line-opacity":0.75,"line-width":["interpolate",["linear"],["zoom"],2,0.7,8,2.2]}});
 const map=new maplibregl.Map({container:"map",style,center:[cfg.home.lon,cfg.home.lat],zoom:3.1,
   attributionControl:false,maxZoom:19.4}); // 19.4 = street level; OSM/Esri tiles overzoom slightly past native 19
 map.addControl(new maplibregl.NavigationControl({visualizePitch:true}),"top-right");
@@ -418,10 +488,27 @@ const SRC={ // each returns fresh GeoJSON from state
     properties:{code:b.code,name:b.name,d:b.d,df:b.df,stress:b.df?b.d/b.df:null,period:b.period}}))}),
   power:()=>S.power||EMPTY,
   night:()=>nightPolygon(),
+  ships:()=>({type:"FeatureCollection",features:Object.values(S.ships).map(v=>({type:"Feature",
+    geometry:{type:"Point",coordinates:[v.lon,v.lat]},properties:{name:v.name||("MMSI "+v.mmsi),sog:v.sog,cog:v.cog}}))}),
+  sats:()=>({type:"FeatureCollection",features:S.sats.map(s=>({type:"Feature",
+    geometry:{type:"Point",coordinates:[s.lon,s.lat]},properties:{name:s.name,grp:s.grp,alt:Math.round(s.alt)}}))}),
+  flow:()=>({type:"FeatureCollection",features:S.flows.map(f=>({type:"Feature",
+    geometry:{type:"LineString",coordinates:[[f.a.lon,f.a.lat],[f.b.lon,f.b.lat]]},
+    properties:{mw:f.mw,from:f.from,to:f.to}}))}),
 };
 map.on("load",()=>{
   for(const id in SRC)map.addSource(id,{type:"geojson",data:SRC[id]()});
   map.addLayer({id:"night",type:"fill",source:"night",paint:{"fill-color":"#000","fill-opacity":0.28}});
+  map.addLayer({id:"flow",type:"line",source:"flow",layout:{visibility:"none","line-cap":"round"},
+    paint:{"line-color":["case",["<",["get","mw"],0],"#e0b24b","#7fe0bd"],
+      "line-width":["interpolate",["linear"],["abs",["get","mw"]],25,1,2000,3.5,8000,7],
+      "line-opacity":0.8,"line-dasharray":["literal",[0,2,3]]}});
+  map.addLayer({id:"ships",type:"circle",source:"ships",layout:{visibility:"none"},
+    paint:{"circle-color":"#5bb8d9","circle-radius":["interpolate",["linear"],["zoom"],3,2,10,5],
+      "circle-stroke-color":"#04120c","circle-stroke-width":1}});
+  map.addLayer({id:"sats",type:"circle",source:"sats",layout:{visibility:"none"},
+    paint:{"circle-color":["match",["get","grp"],"stations","#7fd4ff","weather","#7fe0bd","starlink","#c9b8ff","#d98a5b"],
+      "circle-radius":2.6,"circle-opacity":0.9}});
   map.addLayer({id:"alertpolys",type:"fill",source:"alertpolys",paint:{"fill-color":
     ["match",["get","sev"],"Extreme","#d9455b","Severe","#d96a5b","Moderate","#e0b24b","#8fa69e"],"fill-opacity":0.22}});
   map.addLayer({id:"alertlines",type:"line",source:"alertpolys",paint:{"line-color":"#d96a5b","line-width":1.3,"line-opacity":0.8}});
@@ -491,12 +578,14 @@ function radarPlay(on){
   else{radarFrame=RADAR_FRAMES.length-1;if(LAYERS.radar.on)radarShow(radarFrame);$("btnRadarPause").textContent="▶";}}
 
 /* ---------- ambient rotation: the always-on beautiful globe ---------- */
-let ambientRAF=null,lastInteract=0;
-["mousedown","wheel","touchstart"].forEach(ev=>map.getCanvas().addEventListener(ev,()=>lastInteract=now()));
+let ambientRAF=null,lastInteract=0,userBusy=false;
+// FIX: track interaction END, not just start — trackpad inertia used to re-arm the pause forever.
+["dragstart","zoomstart","rotatestart","pitchstart"].forEach(ev=>map.on(ev,()=>{userBusy=true;lastInteract=now();}));
+["dragend","zoomend","rotateend","pitchend"].forEach(ev=>map.on(ev,()=>{userBusy=false;lastInteract=now();}));
 function ambientTick(){
   if(!S.ambient){ambientRAF=null;return;}
-  if(now()-lastInteract>4000&&!document.hidden){
-    const c=map.getCenter();map.setCenter([c.lng+0.045,c.lat*0.999]); }
+  if(!userBusy&&!map.isMoving()&&now()-lastInteract>6000&&!document.hidden){
+    const c=map.getCenter();map.setCenter([c.lng+0.045,c.lat*0.999]); } // resumes 6 s after you let go — no re-toggle needed
   ambientRAF=requestAnimationFrame(ambientTick);}
 function setAmbient(on){S.ambient=on;$("btnAmbient").classList.toggle("on",on);
   if(on){if(map.getZoom()>4.2)map.easeTo({zoom:2.6,pitch:0,duration:1800});
@@ -549,6 +638,11 @@ const LAYERS={
   aircraft:{name:"Aircraft (ADS-B)",color:"#b8c7ff",on:false,badge:"MEASURED",info:"aircraft",maps:["aircraft"]},
   terminator:{name:"Day/Night Line",color:"#8fa69e",on:true,badge:"MODELED",info:"terminator",maps:["night"]},
   counties:{name:"County Lines & Names (US)",color:"#a8d8c5",on:true,badge:"OFFICIAL",info:"counties",maps:["county-lines","county-labels"]},
+  faults:{name:"Fault Lines (global)",color:"#d9455b",on:false,badge:"MEASURED",info:"faults",maps:["fault-lines"]},
+  flow:{name:"Power Flow Between BAs",color:"#7fe0bd",on:false,badge:"MEASURED",info:"flow",maps:["flow"]},
+  traffic:{name:"Road Traffic (needs TomTom key)",color:"#e07a4b",on:false,badge:"MEASURED",info:"traffic",maps:["traffic"]},
+  ships:{name:"Ships / AIS (needs AISStream key)",color:"#5bb8d9",on:false,badge:"MEASURED",info:"ships",maps:["ships"]},
+  sats:{name:"Satellites & Debris (pick groups below)",color:"#c9b8ff",on:false,badge:"MODELED",info:"sats",maps:["sats"]},
 };
 function applyLayerVisibility(){
   for(const k in LAYERS){const L=LAYERS[k];
@@ -566,7 +660,83 @@ function renderLayerList(){
     <button class="ibtn" data-info="${L.info}">i</button></div>`;}).join("");}
 const FRESH={};
 document.addEventListener("click",e=>{const s=e.target.closest(".sw[data-layer]");if(!s)return;
-  const L=LAYERS[s.dataset.layer];L.on=!L.on;applyLayerVisibility();renderLayerList();});
+  const L=LAYERS[s.dataset.layer];L.on=!L.on;applyLayerVisibility();renderLayerList();
+  if(s.dataset.layer==="traffic")ensureTraffic();
+  if(s.dataset.layer==="ships")shipsConnect();
+  if(s.dataset.layer==="flow"&&L.on)runAll(true);});
+
+/* ---- Road traffic: TomTom flow tiles (free key). Current speeds only — TomTom keeps no public history. ---- */
+function ensureTraffic(){
+  if(!LAYERS.traffic.on)return;
+  if(!cfg.tomtomKey){ledger("TomTom","","traffic layer needs a free key — add in ⚙ Key Vault","OFF","UNAVAILABLE","developer.tomtom.com, ~2500 tiles/day free");wd("traffic","gray","no key");return;}
+  if(!map.getSource("traffic")){
+    map.addSource("traffic",{type:"raster",tileSize:256,
+      tiles:["https://api.tomtom.com/traffic/map/4/tile/flow/relative0/{z}/{x}/{y}.png?key="+encodeURIComponent(cfg.tomtomKey)]});
+    map.addLayer({id:"traffic",type:"raster",source:"traffic",paint:{"raster-opacity":0.85}});
+    ledger("TomTom Traffic","api.tomtom.com","flow tiles enabled","OK","MEASURED","relative current speeds; green=free flow, red=congested; no historical replay via free tier");}
+  applyLayerVisibility();}
+
+/* ---- Ships: AISStream websocket (free key). Terrestrial receivers → mostly coastal coverage. ---- */
+let aisWS=null,aisSubTimer=null;
+function shipsConnect(){
+  if(!LAYERS.ships.on){if(aisWS){try{aisWS.close();}catch(e){}aisWS=null;}return;}
+  if(typeof WebSocket==="undefined")return;
+  if(!cfg.aisKey){ledger("AISStream","","ships layer needs a free key — add in ⚙ Key Vault","OFF","UNAVAILABLE","aisstream.io — free, instant");wd("ships","gray","no key");return;}
+  if(aisWS)try{aisWS.close();}catch(e){}
+  aisWS=new WebSocket("wss://stream.aisstream.io/v0/stream");
+  aisWS.onopen=()=>{aisSubscribe();ledger("AISStream","stream.aisstream.io","connected","OK","MEASURED","volunteer terrestrial AIS — coastal coverage; open ocean gaps are normal");wd("ships","ok","live");};
+  aisWS.onerror=()=>{wd("ships","bad","socket error");};
+  aisWS.onclose=()=>{if(LAYERS.ships.on)setTimeout(shipsConnect,15000);};
+  aisWS.onmessage=ev=>{try{const m=JSON.parse(ev.data);
+    if(m.MessageType==="PositionReport"){const p=m.Message.PositionReport,md=m.MetaData||{};
+      S.ships[p.UserID]={mmsi:p.UserID,lat:p.Latitude,lon:p.Longitude,sog:p.Sog,cog:p.Cog,name:(md.ShipName||"").trim()};
+      const keys=Object.keys(S.ships);if(keys.length>1500)delete S.ships[keys[0]];}}catch(e){}};
+  if(!shipsConnect._render)shipsConnect._render=setInterval(()=>{if(LAYERS.ships.on)gj("ships");},3000);
+  map.on("moveend",()=>{if(LAYERS.ships.on){clearTimeout(aisSubTimer);aisSubTimer=setTimeout(aisSubscribe,1200);}});}
+function aisSubscribe(){
+  if(!aisWS||aisWS.readyState!==1)return;const b=map.getBounds();
+  aisWS.send(JSON.stringify({APIKey:cfg.aisKey,BoundingBoxes:[[[b.getSouth(),b.getWest()],[b.getNorth(),b.getEast()]]]}));}
+
+/* ---- Satellites & debris: CelesTrak TLEs + SGP4 (satellite.js), capped for performance ---- */
+const SAT_CAP=400, satGroups={}, satTimer={t:null};
+document.addEventListener("change",e=>{const c=e.target.closest("[data-sat]");if(!c)return;
+  const g=c.dataset.sat;
+  if(c.checked)loadSatGroup(g);else{delete satGroups[g];rebuildSats();}
+  LAYERS.sats.on=Object.keys(satGroups).length>0||document.querySelector("[data-sat]:checked")!=null;
+  applyLayerVisibility();renderLayerList();});
+async function loadSatGroup(g){
+  try{
+    $("satNote").textContent="Loading "+g+" orbits from CelesTrak…";
+    const r=await fetch("https://celestrak.org/NORAD/elements/gp.php?GROUP="+encodeURIComponent(g)+"&FORMAT=tle");
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    const lines=(await r.text()).split(/\r?\n/);const recs=[];
+    for(let i=0;i+2<lines.length&&recs.length<SAT_CAP;i+=3){
+      const name=lines[i].trim(),l1=lines[i+1],l2=lines[i+2];
+      if(!l1||!l1.startsWith("1 "))continue;
+      try{recs.push({name,grp:g,rec:satellite.twoline2satrec(l1,l2),epoch:tleEpoch(l1)});}catch(e){}}
+    satGroups[g]=recs;
+    const ageD=recs.length?((now()-Math.max(...recs.map(x=>x.epoch)))/864e5).toFixed(1):"?";
+    ledger("CelesTrak","celestrak.org",g+": "+recs.length+" objects loaded (cap "+SAT_CAP+")","OK","MEASURED","TLE age "+ageD+" d; SGP4 accuracy degrades with age");
+    $("satNote").textContent="SGP4-propagated from CelesTrak orbits (freshest TLE "+ageD+" d old). MODELED positions from MEASURED orbits. Caps keep it fast; the full public catalog is ~27,000 objects.";
+    rebuildSats();
+    if(!satTimer.t)satTimer.t=setInterval(rebuildSats,8000);
+  }catch(e){ledger("CelesTrak","celestrak.org",g+" failed: "+e.message,"FAIL","UNAVAILABLE","");wd("sats","bad",e.message);
+    $("satNote").textContent="CelesTrak fetch failed — see Watchdog.";}}
+function tleEpoch(l1){const yy=+l1.slice(18,20),dd=+l1.slice(20,32);
+  const y=yy<57?2000+yy:1900+yy;return Date.UTC(y,0,1)+(dd-1)*864e5;}
+function rebuildSats(){
+  const t=new Date(),gmst=satellite.gstime(t),out=[];
+  for(const g in satGroups)for(const s of satGroups[g]){
+    try{const pv=satellite.propagate(s.rec,t);if(!pv.position)continue;
+      const gd=satellite.eciToGeodetic(pv.position,gmst);
+      out.push({name:s.name,grp:g,lat:satellite.degreesLat(gd.latitude),lon:satellite.degreesLong(gd.longitude),alt:gd.height});}catch(e){}}
+  S.sats=out;gj("sats");}
+
+/* ---- Power-flow line animation: moving dashes show direction (representation, not literal electrons) ---- */
+const FLOW_DASH=[[0,2,3],[1,2,2],[2,2,1],[3,2,0]];let flowStep=0;
+setInterval(()=>{if(!LAYERS.flow.on||!map.getLayer("flow"))return;
+  flowStep=(flowStep+1)%FLOW_DASH.length;
+  map.setPaintProperty("flow","line-dasharray",FLOW_DASH[flowStep]);},220);
 
 /* =====================================================================
    DATA ADAPTERS — fetch, validate, ledger. Each declares its own honest
@@ -636,6 +806,12 @@ wind:{name:"SWPC Solar Wind (DSCOVR)",int:300,staleSec:1500,enabled:()=>true,
   if(!r.ok)throw new Error("HTTP "+r.status);const j=await r.json();const last=j[j.length-1];
   S.wind={speed:+last[2],dens:+last[1],t:Date.parse(last[0]+"Z")};
   ledger("NOAA SWPC","services.swpc.noaa.gov","solar wind "+Math.round(S.wind.speed)+" km/s","OK","MEASURED","L1 measurement, 15–60 min upstream");}},
+imf:{name:"SWPC IMF Bz/Bt (DSCOVR mag)",int:300,staleSec:1500,enabled:()=>true,
+ run:async()=>{const r=await fetch("https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json");
+  if(!r.ok)throw new Error("HTTP "+r.status);const j=await r.json();const last=j[j.length-1];
+  // columns: time_tag, bx_gsm, by_gsm, bz_gsm, lon, lat, bt
+  S.imf={bz:+last[3],bt:+last[6],t:Date.parse(last[0]+"Z")};
+  ledger("NOAA SWPC","services.swpc.noaa.gov",`IMF Bz ${S.imf.bz>=0?"+":""}${S.imf.bz.toFixed(1)} nT · Bt ${S.imf.bt.toFixed(1)} nT`,"OK","MEASURED","L1 measurement; sustained southward (negative) Bz is the storm-coupling condition");}},
 xray:{name:"SWPC GOES X-ray",int:300,staleSec:1500,enabled:()=>true,
  run:async()=>{const r=await fetch("https://services.swpc.noaa.gov/json/goes/primary/xrays-1-day.json");
   if(!r.ok)throw new Error("HTTP "+r.status);const j=await r.json();
@@ -654,14 +830,38 @@ iss:{name:"ISS Position",int:65,staleSec:300,enabled:()=>true,
   S.issTrail.push({lat:j.latitude,lon:j.longitude});if(S.issTrail.length>45)S.issTrail.shift();
   gj("iss");gj("isstrail");FRESH.iss=now();
   ledger("WhereTheISS.at","api.wheretheiss.at",`ISS ${j.latitude.toFixed(1)},${j.longitude.toFixed(1)}`,"OK","MEASURED","~km accuracy TLE propagation");}},
-opensky:{name:"OpenSky Aircraft",int:75,staleSec:400,enabled:()=>LAYERS.aircraft.on,offNote:"layer off — toggle Aircraft to fetch",
+opensky:{name:"Aircraft (OpenSky → adsb.fi fallback)",int:75,staleSec:400,enabled:()=>LAYERS.aircraft.on,offNote:"layer off — toggle Aircraft to fetch",
  run:async()=>{const c=map.getCenter(),d=2.2;
-  const r=await fetch(`https://opensky-network.org/api/states/all?lamin=${(c.lat-d).toFixed(2)}&lomin=${(c.lng-d*1.2).toFixed(2)}&lamax=${(c.lat+d).toFixed(2)}&lomax=${(c.lng+d*1.2).toFixed(2)}`);
-  if(!r.ok)throw new Error("HTTP "+r.status+(r.status===429||r.status===401?" — OpenSky restricts anonymous access; see layer ⓘ":""));
-  const j=await r.json();
-  S.aircraft=(j.states||[]).filter(s=>s[5]!=null&&s[6]!=null).map(s=>({icao:s[0],cs:(s[1]||"").trim(),lon:s[5],lat:s[6],alt:s[7],vel:s[9],hdg:s[10]}));
-  gj("aircraft");FRESH.aircraft=now();
-  ledger("OpenSky","opensky-network.org",S.aircraft.length+" aircraft in view","OK","MEASURED","anonymous tier; volunteer receiver coverage");}},
+  try{
+    const r=await fetch(`https://opensky-network.org/api/states/all?lamin=${(c.lat-d).toFixed(2)}&lomin=${(c.lng-d*1.2).toFixed(2)}&lamax=${(c.lat+d).toFixed(2)}&lomax=${(c.lng+d*1.2).toFixed(2)}`);
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    const j=await r.json();
+    S.aircraft=(j.states||[]).filter(s=>s[5]!=null&&s[6]!=null).map(s=>({icao:s[0],cs:(s[1]||"").trim(),lon:s[5],lat:s[6],alt:s[7],vel:s[9],hdg:s[10]}));
+    gj("aircraft");FRESH.aircraft=now();
+    ledger("OpenSky","opensky-network.org",S.aircraft.length+" aircraft in view","OK","MEASURED","anonymous tier; volunteer receiver coverage");
+  }catch(e1){
+    // Automatic alternative — you asked for fallbacks on anything that fails regularly. adsb.fi is a community feed with an open API (fair use).
+    const rf=await fetch(`https://opendata.adsb.fi/api/v2/lat/${c.lat.toFixed(3)}/lon/${c.lng.toFixed(3)}/dist/150`);
+    if(!rf.ok)throw new Error("OpenSky ("+e1.message+") AND adsb.fi (HTTP "+rf.status+") both failed");
+    const jf=await rf.json();
+    S.aircraft=(jf.ac||jf.aircraft||[]).filter(a=>a.lat!=null&&a.lon!=null).map(a=>({icao:a.hex,cs:(a.flight||"").trim(),lon:a.lon,lat:a.lat,alt:a.alt_baro,vel:a.gs!=null?a.gs*0.5144:null,hdg:a.track}));
+    gj("aircraft");FRESH.aircraft=now();
+    ledger("adsb.fi (fallback)","opendata.adsb.fi",S.aircraft.length+" aircraft within 150 nm — OpenSky was unavailable","OK","MEASURED","community ADS-B feed; fair-use; coverage depends on volunteer receivers");}}},
+eiaflow:{name:"EIA Interchange (power flow)",int:900,staleSec:5400,enabled:()=>!!cfg.eiaKey&&LAYERS.flow.on,offNote:"needs EIA key + Power Flow layer on",
+ run:async()=>{
+  const r=await fetch(`https://api.eia.gov/v2/electricity/rto/interchange-data/data/?api_key=${cfg.eiaKey}&frequency=hourly&data[0]=value&sort[0][column]=period&sort[0][direction]=desc&length=800`);
+  if(!r.ok)throw new Error("HTTP "+r.status);
+  const j=await r.json();const rows=(j.response&&j.response.data)||[];
+  const seen=new Set(),flows=[];
+  for(const row of rows){
+    const A=BA_CENTROIDS[row.fromba],B=BA_CENTROIDS[row.toba];if(!A||!B)continue;
+    const key=[row.fromba,row.toba].sort().join("~");if(seen.has(key))continue;seen.add(key);
+    let mw=+row.value;if(!isFinite(mw)||Math.abs(mw)<25)continue;
+    let a=A,b=B,from=row.fromba,to=row.toba;
+    if(mw<0){a=B;b=A;from=row.toba;to=row.fromba;mw=-mw;} // normalize: line always drawn exporter → importer
+    flows.push({a,b,from,to,mw});}
+  S.flows=flows;gj("flow");FRESH.flow=now();
+  ledger("EIA-930 Interchange","api.eia.gov",flows.length+" active BA-to-BA flows","OK","MEASURED","hourly, 1–2 h lag; drawn between region centroids (MODELED positions); animation = direction, not literal electrons");}},
 firms:{name:"NASA FIRMS Fires",int:900,staleSec:3600,enabled:()=>!!cfg.firmsKey,offNote:"needs free FIRMS key in ⚙",
  run:async()=>{const la=S.loc.lat,lo=S.loc.lon,d=6;
   const r=await fetch(`https://firms.modaps.eosdis.nasa.gov/api/area/csv/${cfg.firmsKey}/VIIRS_SNPP_NRT/${(lo-d).toFixed(1)},${(la-d).toFixed(1)},${(lo+d).toFixed(1)},${(la+d).toFixed(1)}/1`);
@@ -694,12 +894,56 @@ eia:{name:"EIA-930 All Balancing Authorities",int:900,staleSec:5400,enabled:()=>
 function fluxClass(f){if(!isFinite(f))return"—";
   if(f>=1e-4)return"X"+(f/1e-4).toFixed(1);if(f>=1e-5)return"M"+(f/1e-5).toFixed(1);
   if(f>=1e-6)return"C"+(f/1e-6).toFixed(1);if(f>=1e-7)return"B"+(f/1e-7).toFixed(1);return"A";}
+/* ---- Feed status: loading / ok / fail / off, per source, always visible ---- */
+const FEEDMETA={ // short label, official site to view the same data yourself, honest fallback note
+ quakes:{lbl:"Quakes",url:"https://earthquake.usgs.gov/earthquakes/map/",alt:"USGS is the primary global source; EMSC (emsc-csem.org) is the independent European alternative."},
+ alerts:{lbl:"Alerts",url:"https://www.weather.gov/",alt:"US-official; no equal substitute. If down, check weather.gov directly or NOAA Weather Radio."},
+ meteo:{lbl:"Weather",url:"https://open-meteo.com/",alt:"Model-based; NWS point forecast (forecast.weather.gov) is the official alternative."},
+ kp:{lbl:"Kp",url:"https://www.swpc.noaa.gov/products/planetary-k-index",alt:"NOAA SWPC is the operational source; GFZ Potsdam (kp.gfz-potsdam.de) computes the definitive Kp."},
+ wind:{lbl:"SolarWind",url:"https://www.swpc.noaa.gov/products/real-time-solar-wind",alt:"Same DSCOVR data is on the SWPC dashboard directly."},
+ xray:{lbl:"X-ray",url:"https://www.swpc.noaa.gov/products/goes-x-ray-flux",alt:"GOES X-ray plots on SWPC directly."},
+ imf:{lbl:"IMF Bz",url:"https://www.swpc.noaa.gov/products/real-time-solar-wind",alt:"Same DSCOVR magnetometer data on the SWPC real-time dashboard."},
+ donki:{lbl:"DONKI",url:"https://kauai.ccmc.gsfc.nasa.gov/DONKI/",alt:"DEMO_KEY rate-limits often — a free api.nasa.gov key fixes most failures."},
+ iss:{lbl:"ISS",url:"https://spotthestation.nasa.gov/tracking_map.cfm",alt:"NASA Spot the Station shows the same position; our Satellites layer (Stations group) is a second internal path."},
+ opensky:{lbl:"Aircraft",url:"https://globe.adsb.fi/",alt:"Auto-fallback to adsb.fi is already built in. To view in a browser: globe.adsb.fi or globe.airplanes.live."},
+ firms:{lbl:"Fires",url:"https://firms.modaps.eosdis.nasa.gov/map/",alt:"The FIRMS web map shows the same detections without a key."},
+ eia:{lbl:"Grid",url:"https://www.eia.gov/electricity/gridmonitor/",alt:"EIA Grid Monitor site shows the same data. ERCOT-specific: ercot.com/gridmydashboard."},
+ eiaflow:{lbl:"PowerFlow",url:"https://www.eia.gov/electricity/gridmonitor/dashboard/electric_overview/US48/US48",alt:"Interchange charts on the EIA Grid Monitor."},
+};
+function renderFeedBar(){
+  const el=$("feedBar");if(!el)return;
+  el.innerHTML=Object.keys(ADAPTERS).map(id=>{
+    const a=ADAPTERS[id],m=FEEDMETA[id]||{lbl:id};
+    const st=a.loading?"loading":!a.enabled()?"off":a.lastErr?"fail":a.lastOk?"ok":"loading";
+    const age=a.lastOk?fmtAge(a.lastOk):"";
+    return `<span class="fchip ${st}" data-feed="${id}" title="${esc(a.name)} — click for status & official site">
+      <span class="fdot"></span>${m.lbl}${st==="ok"?" · "+age:st==="fail"?" ✕":st==="off"?" —":""}</span>`;}).join("")
+    +`<button class="ibtn" data-info="feeds" style="margin-left:auto">i</button>`;}
+document.addEventListener("click",e=>{
+  const c=e.target.closest("[data-feed]");if(!c)return;
+  const id=c.dataset.feed,a=ADAPTERS[id],m=FEEDMETA[id]||{};
+  const st=a.loading?"LOADING now":!a.enabled()?"OFF — "+(a.offNote||"disabled"):a.lastErr?"FAILED":"OK";
+  $("modal").innerHTML=`<h3>${esc(a.name)}</h3><div class="infobody">
+    <div class="sec"><b>Status:</b> ${esc(st)}${a.lastOk?" · last good data "+fmtAge(a.lastOk)+" ago":" · no successful fetch yet this session"}
+    · polls every ${a.int}s</div>
+    ${a.lastErr?`<div class="sec"><b>Last error:</b> ${esc(a.lastErr)}</div>`:""}
+    ${m.alt?`<div class="sec"><b>What next / alternatives:</b> ${esc(m.alt)}</div>`:""}
+    <div class="row">
+      ${m.url?`<a class="hbtn" href="${m.url}" target="_blank" rel="noopener">↗ View at official source</a>`:""}
+      <button class="hbtn" data-retryfeed="${id}">↻ Retry now</button>
+      <button class="hbtn" onclick="document.getElementById('modalBack').classList.remove('open')">CLOSE</button></div>
+    <div class="finer">Every fetch attempt is also recorded in the Truth Ledger.</div></div>`;
+  $("modalBack").classList.add("open");});
+document.addEventListener("click",e=>{const r=e.target.closest("[data-retryfeed]");if(!r)return;
+  $("modalBack").classList.remove("open");runAdapter(r.dataset.retryfeed,true);});
+
 async function runAdapter(id,force){const a=ADAPTERS[id];
-  if(!a.enabled()){wd(id,"off",a.offNote||"off");return;}
+  if(!a.enabled()){wd(id,"off",a.offNote||"off");renderFeedBar();return;}
   if(!force&&a.lastTry&&(now()-a.lastTry)/1e3<a.int)return;
-  a.lastTry=now();
+  a.lastTry=now();a.loading=true;renderFeedBar();
   try{if(S.mock)return; await a.run();a.lastOk=now();a.lastErr=null;wd(id,"ok","fresh");}
-  catch(e){a.lastErr=e.message;ledger(a.name,"",e.message,"FAIL","UNAVAILABLE","");wd(id,"warn",e.message);}}
+  catch(e){a.lastErr=e.message;ledger(a.name,"",e.message,"FAIL","UNAVAILABLE","");wd(id,"warn",e.message);}
+  finally{a.loading=false;renderFeedBar();}}
 
 /* =====================================================================
    MOCK MODE — unmistakable. Banner + purple + every item tagged mock.
@@ -712,7 +956,7 @@ function applyMock(on){
     S.fires=[{lat:33.5,lon:-98.1,conf:"h",when:"(MOCK)",sat:"MOCK",mock:true}];
     S.alerts=[{event:"Heat Advisory (MOCK)",sev:"Moderate",headline:"SAMPLE — labeled mock",area:"Wise County, TX (SAMPLE)",
       sender:"MOCK",mock:true,geom:{type:"Polygon",coordinates:[[[-98.2,33.0],[-97.2,33.0],[-97.2,33.7],[-98.2,33.7],[-98.2,33.0]]]}}];
-    S.kp={v:5.3,t:now()};S.wind={speed:612,dens:4.2,t:now()};S.xray={flux:2.3e-5,t:now()};
+    S.kp={v:5.3,t:now()};S.wind={speed:612,dens:4.2,t:now()};S.xray={flux:2.3e-5,t:now()};S.imf={bz:-8.4,bt:12.1,t:now()};
     S.ba={ERCO:{code:"ERCO",name:"ERCOT (MOCK)",lat:31.2,lon:-99.3,d:71000,df:66000,period:"MOCK"}};
     ledger("MOCK MODE","","sample data injected — ALL items tagged MOCK","OK","MOCK","demo only");
   }else{S.quakes=[];S.fires=[];S.alerts=[];S.ba={};ledger("MOCK MODE","","cleared — resuming live fetches","OK","OFFICIAL","");}
@@ -729,6 +973,9 @@ function runAnomalyEngine(){
   if(S.kp&&S.kp.v>=5)push(S.kp.v>=7?3:2,"HIGH",`Geomagnetic storm level Kp ${S.kp.v.toFixed(1)}`,
     "Planetary Kp at storm level. Elevated probability of GPS degradation, HF radio issues, aurora at unusual latitudes, and grid-operator mitigation actions. Watch condition, not an outage prediction.",
     "NOAA SWPC","Sustained Kp≥7, rising solar wind speed, or an SWPC G-scale alert would increase confidence.");
+  if(S.imf&&S.imf.bz<=-10)push(2,"MEDIUM",`IMF Bz strongly southward: ${S.imf.bz.toFixed(1)} nT`,
+    "Sustained southward Bz opens the coupling between the solar wind and Earth's magnetosphere — the primary precondition for geomagnetic storming. Watch condition: whether a storm follows depends on duration and solar-wind speed.",
+    "NOAA SWPC/DSCOVR (measured at L1)","Kp rising in the next 1–3 hours, or an SWPC G-scale alert, would confirm coupling.");
   if(S.wind&&S.wind.speed>600)push(1,"MEDIUM",`Solar wind elevated: ${Math.round(S.wind.speed)} km/s`,
     "Above-typical solar wind speed measured at L1; arrives at Earth ~15–60 min after measurement.",
     "NOAA SWPC/DSCOVR","A coincident CME arrival notice from DONKI would increase confidence.");
@@ -759,6 +1006,35 @@ function runAnomalyEngine(){
   if(S.kp&&S.kp.v>=6&&Object.keys(S.ba).length)push(2,"MEDIUM","Geomagnetic storm while grid monitoring is active",
     "Kp≥6 concurrent with grid observation. Geomagnetically induced currents are possible at storm levels; impact is operator-managed. Watch condition.",
     "SWPC + EIA-930","A NOAA G3+ alert naming grid impacts would increase confidence.");
+  /* ---- Baseline unusualness: counts near your location vs YOUR OWN recorded history ---- */
+  const q480=S.quakes.filter(q=>!q.mock&&haversine(loc.lat,loc.lon,q.lat,q.lon)<=480).length;
+  const f160=S.fires.filter(f=>!f.mock&&haversine(loc.lat,loc.lon,f.lat,f.lon)<=160).length;
+  const aLoc=S.alerts.filter(a=>a.local&&!a.mock).length;
+  if(!S.mock){
+    const base=store.get("base",[]);
+    const med=arr=>{const s=[...arr].sort((a,b)=>a-b);return s.length?s[Math.floor(s.length/2)]:0;};
+    const days=new Set(base.map(b=>b.d.slice(0,10))).size;
+    const conf=days>=14?"MEDIUM":days>=4?"LOW":null;
+    if(conf){
+      const test=(cnt,key,label,src)=>{const m=med(base.map(b=>b[key]));
+        if(cnt>=3&&cnt>Math.max(2*m,m+3))push(2,conf,`Unusual number of ${label} near ${loc.name.split(",")[0]}: ${cnt} vs typical ~${m}`,
+          `Compared against YOUR ${days}-day recorded baseline for this app, not a scientific climatology. Pattern detected — could also reflect improved detection, feed changes, or normal clustering.`,
+          src,`A longer baseline (14+ days) and agreement from official sources would increase confidence. Baseline so far: ${days} day(s).`);};
+      test(q480,"q","earthquakes (within 300 mi)","USGS");
+      test(f160,"f","fire detections (within 100 mi)","NASA FIRMS");
+      test(aLoc,"a","active weather alerts (local)","NWS");
+      const flagged=[q480>Math.max(2*med(base.map(b=>b.q)),med(base.map(b=>b.q))+3)&&q480>=3,
+                     f160>Math.max(2*med(base.map(b=>b.f)),med(base.map(b=>b.f))+3)&&f160>=3,
+                     aLoc>Math.max(2*med(base.map(b=>b.a)),med(base.map(b=>b.a))+3)&&aLoc>=3].filter(Boolean).length;
+      if(flagged>=2)push(3,conf,"Multiple layers elevated at once near "+loc.name.split(",")[0],
+        "Two or more independent public feeds are simultaneously above your recorded baseline. Cross-source agreement is stronger evidence than any single feed — still a correlation, not a proven cause.",
+        "Cross-layer pattern engine","Official alerts naming the same event would confirm.");
+    }
+    // record a snapshot at most every 6 h, keep ~60 (≈15 days at 4/day)
+    const last=base[base.length-1];
+    if(!last||now()-Date.parse(last.d)>216e5){base.push({d:new Date().toISOString(),q:q480,f:f160,a:aLoc});
+      store.set("base",base.slice(-60));}
+  }
   S.anomalies=A.sort((x,y)=>y.sev-x.sev);
 }
 
@@ -777,8 +1053,10 @@ function renderBrief(){
   <div class="brief-metric"><span>Nearest quake (24h)</span><span class="v">${nearestQ?`M${nearestQ.q.mag.toFixed(1)} · ${Math.round(nearestQ.d)} km`:"none"}</span></div>
   <div class="brief-metric"><span>Nearest fire detection</span><span class="v">${nearestF?Math.round(nearestF.d)+" km":cfg.firmsKey?"none":"needs key"}</span></div>
   <div class="brief-metric"><span>Kp / solar wind</span><span class="v">${S.kp?S.kp.v.toFixed(1):"—"} · ${S.wind?Math.round(S.wind.speed)+" km/s":"—"}</span></div>
+  <div class="brief-metric"><span>IMF Bz / Bt <button class="ibtn" data-info="imf">i</button></span><span class="v">${S.imf?(S.imf.bz>=0?"+":"")+S.imf.bz.toFixed(1)+" / "+S.imf.bt.toFixed(1)+" nT":"—"}</span></div>
   <div class="brief-metric"><span>X-ray class</span><span class="v">${S.xray?fluxClass(S.xray.flux):"—"}</span></div>
   <div class="brief-metric"><span>Moon <button class="ibtn" data-info="moon">i</button></span><span class="v">${m.name} · ${m.illum}%</span></div>
+  <button class="subbtn" id="btnSkyLab">☾ Sky &amp; Eclipse Lab — how phases and eclipses work</button>
   <div class="finer" style="margin-top:6px">Conditions <span class="badge b-measured">MEASURED</span> · moon <span class="badge b-modeled">MODELED</span>${S.mock?' · <span class="badge b-mock">MOCK MODE</span>':""}</div>`;}
 function renderAnomalies(){
   const list=S.anomalies.filter(a=>!S.integrity||a.conf==="HIGH"||a.conf==="OFFICIAL");
@@ -795,6 +1073,63 @@ function renderBaMini(){
     <td style="color:${s>1.04?"var(--bad)":s>0.99?"var(--warn)":"#4ecb8d"}">${((s-1)*100).toFixed(1)}%</td></tr>`;}).join("")}</table>
     <div class="finer">vs own forecast · top 8 · click circles on map for all</div>`:"";}
 let curTab="alerts";
+/* =====================================================================
+   SOURCE REGISTRY — power grid + earth-field expansion.
+   status: LIVE = fetched by this app now · KEYED = live once you add a free key
+   · STUB = adapter interface reserved; needs key/server/CORS proxy · LINK = view at source (no lawful browser API)
+   Trust tiers: 1 official operational · 2 official dataset/science · 3 aggregator
+   · 4 open/crowdsourced · 5 secondary mirror · 6 model/inference · 7 user journal
+   ===================================================================== */
+const REGISTRY=[
+ // ---- POWER GRID ----
+ {m:"grid",id:"eia930",n:"EIA Hourly Grid Monitor (EIA-930)",t:1,st:"LIVE (keyed)",u:"https://www.eia.gov/electricity/gridmonitor/",w:"Official but hourly + 1-2h lag. Aggregated BA level — not substation telemetry."},
+ {m:"grid",id:"eiaflow",n:"EIA-930 Interchange (BA-to-BA flow)",t:1,st:"LIVE (keyed)",u:"https://www.eia.gov/electricity/gridmonitor/dashboard/electric_overview/US48/US48",w:"Hourly interchange; line positions are region centroids (MODELED)."},
+ {m:"grid",id:"ercot_cond",n:"ERCOT Grid Conditions / PRC / reserves",t:1,st:"LINK",u:"https://www.ercot.com/gridmktinfo/dashboards/gridconditions",w:"ERCOT dashboards block direct browser API access (CORS); their public API portal requires registration. View at source; adapter slot reserved."},
+ {m:"grid",id:"ercot_fuel",n:"ERCOT Fuel Mix",t:1,st:"LINK",u:"https://www.ercot.com/gridmktinfo/dashboards/fuelmix",w:"Same CORS boundary. Not a data gap in this app's honesty — a browser limitation stated plainly."},
+ {m:"grid",id:"txans",n:"ERCOT TXANS advisories",t:1,st:"LINK",u:"https://www.ercot.com/txans",w:"Public advisory system; does not replace emergency alerts."},
+ {m:"grid",id:"gridstatus",n:"GridStatus.io (all US ISOs)",t:3,st:"LINK",u:"https://www.gridstatus.io/live",w:"Excellent aggregator; API is Python/server-side. Cross-check EIA numbers here."},
+ {m:"grid",id:"caiso",n:"CAISO Today's Outlook",t:1,st:"LINK",u:"https://www.caiso.com/todays-outlook",w:"California official; no browser CORS API."},
+ {m:"grid",id:"pjm",n:"PJM Data Miner 2",t:1,st:"STUB",u:"https://dataminer2.pjm.com/",w:"Free key + server-side calls; Phase-2 adapter slot."},
+ {m:"grid",id:"miso",n:"MISO real-time displays",t:1,st:"LINK",u:"https://www.misoenergy.org/markets-and-operations/real-time--market-data/operations-displays/",w:""},
+ {m:"grid",id:"spp",n:"SPP generation mix",t:1,st:"LINK",u:"https://portal.spp.org/pages/integrated-marketplace-generation-mix",w:""},
+ {m:"grid",id:"nyiso",n:"NYISO Real-Time Dashboard",t:1,st:"LINK",u:"https://www.nyiso.com/real-time-dashboard",w:""},
+ {m:"grid",id:"isone",n:"ISO-NE ISO Express",t:1,st:"LINK",u:"https://www.iso-ne.com/isoexpress",w:""},
+ {m:"grid",id:"ieso",n:"IESO Ontario",t:1,st:"LINK",u:"https://www.ieso.ca/power-data",w:""},
+ {m:"grid",id:"aeso",n:"AESO Alberta",t:1,st:"LINK",u:"https://www.aeso.ca/market/market-and-system-reporting/",w:""},
+ {m:"grid",id:"entsoe",n:"ENTSO-E Transparency (Europe)",t:1,st:"STUB",u:"https://transparency.entsoe.eu/",w:"Free token, but API blocks browser CORS — needs Phase-2 relay."},
+ {m:"grid",id:"emaps",n:"Electricity Maps (global mix/carbon)",t:3,st:"LINK",u:"https://app.electricitymaps.com/map/live/fifteen_minutes",w:"Free personal-zone key exists; quality varies by zone."},
+ {m:"grid",id:"iea",n:"IEA Real-Time Electricity Tracker",t:2,st:"LINK",u:"https://www.iea.org/data-and-statistics/data-tools/real-time-electricity-tracker",w:"Aggregated country tracker, not a control-room feed."},
+ {m:"grid",id:"oim",n:"Open Infrastructure Map",t:4,st:"LIVE",u:"https://openinframap.org/",w:"Crowdsourced OSM infrastructure — this app's ⚡ Scan uses the same data via Overpass. Map completeness varies; NOT live operational status."},
+ {m:"grid",id:"overpass",n:"OpenStreetMap Overpass (plants/subs/lines)",t:4,st:"LIVE",u:"https://overpass-api.de/",w:"Same integrity note; absence on map ≠ absence in reality."},
+ {m:"grid",id:"gridfinder",n:"Gridfinder / World Bank derived lines",t:6,st:"LINK",u:"https://energydata.info/dataset/derived-map-of-global-electricity-transmission-and-distribution-lines",w:"MODELED/predicted lines — never treat as verified infrastructure."},
+ {m:"grid",id:"pypsa",n:"PyPSA-Earth (energy-system model)",t:6,st:"LINK",u:"https://pypsa-earth.readthedocs.io/",w:"Simulation tooling, not telemetry."},
+ {m:"grid",id:"pouts",n:"PowerOutage.us",t:3,st:"LINK",u:"https://poweroutage.us/area/state/texas",w:"Best US outage aggregator; API is paid/commercial. View free at source."},
+ {m:"grid",id:"odin",n:"ORNL ODIN county outages",t:2,st:"STUB",u:"https://ornl.opendatasoft.com/explore/dataset/odin-real-time-outages-county/api/",w:"Research-grade county outage API; dataset availability has been intermittent — adapter slot reserved, verify before trusting."},
+ {m:"grid",id:"doe417",n:"DOE-417 major incident reports",t:1,st:"LINK",u:"https://doe417.pnnl.gov/",w:"Official MAJOR-event reporting; not a live local outage feed."},
+ {m:"grid",id:"oncor",n:"Oncor Storm Center (North Texas outages)",t:1,st:"LINK",u:"https://stormcenter.oncor.com/",w:"YOUR utility's official outage map — bookmark it. No public browser API."},
+ {m:"grid",id:"cpe",n:"CenterPoint outage tracker (Houston)",t:1,st:"LINK",u:"https://www.centerpointenergy.com/ot/outagetrackerinformation.html",w:""},
+ {m:"grid",id:"aeptx",n:"AEP Texas outages",t:1,st:"LINK",u:"https://www.aeptexas.com/outages/outagestatus.aspx",w:""},
+ {m:"grid",id:"tnmp",n:"TNMP outage map",t:1,st:"LINK",u:"https://tnmp.com/power-outage-map",w:""},
+ {m:"grid",id:"puct",n:"PUCT STORM territory/outage locator",t:1,st:"LINK",u:"https://www.puc.texas.gov/storm/map/",w:"Which utility serves any Texas address."},
+ {m:"grid",id:"nerc",n:"NERC Bulk Power System Awareness",t:1,st:"LINK",u:"https://www.nerc.com/programs/bulk-power-system-awareness",w:"Reliability context, not telemetry."},
+ // ---- EARTH-FIELD / SPACE WEATHER ----
+ {m:"earth",id:"kp",n:"NOAA SWPC Planetary Kp (1-min est.)",t:1,st:"LIVE",u:"https://www.swpc.noaa.gov/products/planetary-k-index",w:"Kp is a geomagnetic disturbance index — it is NOT Schumann resonance."},
+ {m:"earth",id:"gfzkp",n:"GFZ Potsdam Kp (definitive)",t:2,st:"LINK",u:"https://kp.gfz.de/en/",w:"The authoritative Kp; SWPC's estimate is the operational nowcast."},
+ {m:"earth",id:"wind",n:"NOAA SWPC solar wind plasma (DSCOVR)",t:1,st:"LIVE",u:"https://www.swpc.noaa.gov/products/real-time-solar-wind",w:"Measured at L1 — ~15-60 min upstream of Earth."},
+ {m:"earth",id:"imf",n:"NOAA SWPC IMF Bz/Bt (magnetic field)",t:1,st:"LIVE",u:"https://www.swpc.noaa.gov/products/real-time-solar-wind",w:"Sustained southward Bz (negative) is the key coupling condition for geomagnetic storms."},
+ {m:"earth",id:"xray",n:"GOES X-ray flux / flare class",t:1,st:"LIVE",u:"https://www.swpc.noaa.gov/products/goes-x-ray-flux",w:""},
+ {m:"earth",id:"donki",n:"NASA DONKI event notifications",t:2,st:"LIVE (DEMO_KEY)",u:"https://kauai.ccmc.gsfc.nasa.gov/DONKI/",w:"Analyst-issued notices; DEMO_KEY rate-limits."},
+ {m:"earth",id:"usgsmag",n:"USGS Geomagnetism observatories",t:2,st:"STUB",u:"https://www.usgs.gov/programs/geomagnetism/data",w:"US magnetometer web service exists; adapter slot reserved (response format/CORS verification pending — will not ship half-tested)."},
+ {m:"earth",id:"intermagnet",n:"INTERMAGNET global observatories",t:2,st:"LINK",u:"https://www.intermagnet.org/",w:"Access method and licensing vary per station."},
+ {m:"earth",id:"blitz",n:"Blitzortung live lightning",t:4,st:"LINK",u:"https://map.blitzortung.org/",w:"Community network; their data terms prohibit third-party apps from consuming the live feed — so this app links rather than takes. Coverage varies by region."},
+ {m:"earth",id:"wwlln",n:"WWLLN global lightning",t:2,st:"LINK",u:"https://wwlln.net/",w:"Research network; data by arrangement, not open API. Lightning DRIVES Schumann resonance but lightning density ≠ Schumann amplitude."},
+ {m:"earth",id:"wwllnhist",n:"NASA WWLLN thunder-hour climatology",t:2,st:"LINK",u:"https://www.earthdata.nasa.gov/data/catalog/ghrc-daac-wwllnmth-1",w:"Historical baseline dataset."},
+ {m:"earth",id:"sierra",n:"Sierra Nevada ELF station dataset (Zenodo)",t:2,st:"LINK",u:"https://zenodo.org/records/6348691",w:"Four years of REAL measured ELF/Schumann data — historical, not live. The best honest starting point for Schumann analysis; Phase-2 importer slot reserved."},
+ {m:"earth",id:"schu_mirror",n:"Schumann mirror dashboards (Tomsk-style)",t:5,st:"LINK",u:"https://schumann-frequency-today.com/",w:"TIER 5 — secondary mirrors of uncertain provenance, timestamps, and units. Per your own integrity rules: do not blindly trust; verify original station before drawing any conclusion. No medical, prophetic, or disaster-prediction meaning is established for any Schumann reading."},
+ {m:"earth",id:"heartmath",n:"HeartMath GCI magnetometers",t:5,st:"LINK",u:"https://www.heartmath.org/gci/",w:"Separate the measured magnetometer data from the organization's interpretive framing — this registry treats only the measurements as data."},
+ {m:"earth",id:"celestrak",n:"CelesTrak orbital data",t:2,st:"LIVE",u:"https://celestrak.org/",w:"Feeds the Satellites layer."},
+ {m:"earth",id:"moon",n:"Moon phase / sun position",t:6,st:"LIVE",u:"",w:"Computed locally (MODELED, ±minutes). Contextual timing only — no established causal link to grid or Schumann activity; any correlation you explore is a hypothesis."},
+];
 function renderTab(){
   const B=$("tabBody");
   if(curTab==="alerts"){const list=S.alerts.filter(a=>a.local||a.sev==="Extreme"||a.sev==="Severe");
@@ -816,6 +1151,25 @@ function renderTab(){
     B.innerHTML=Object.entries(WD).map(([k,w])=>`<div style="padding:3px 0"><span class="status-dot s-${w.state}"></span>
     <b style="font-size:12px">${esc(names[k]||k)}</b> <span class="finer">${esc(w.info)} · checked ${fmtAge(w.t)} ago</span></div>`).join("")||
     `<div class="finer">First sweep pending…</div>`;}
+  if(curTab==="registry"){
+    const tierName={1:"Official operational",2:"Official dataset/science",3:"Aggregator",4:"Open/crowdsourced",5:"Secondary mirror",6:"Model/inference",7:"User journal"};
+    const row=r=>`<tr><td>${r.m==="grid"?"⚡":"🌍"}</td><td>${r.u?`<a href="${r.u}" target="_blank" rel="noopener" style="color:var(--vir3)">${esc(r.n)} ↗</a>`:esc(r.n)}</td>
+      <td>T${r.t} <span class="finer">${tierName[r.t]}</span></td><td>${esc(r.st)}</td><td class="finer">${esc(r.w)}</td></tr>`;
+    B.innerHTML=`<div class="finer" style="margin-bottom:6px">Every known lawful source, its trust tier, and its honest adapter status.
+      <b>LIVE</b> = flowing into this app now · <b>KEYED</b> = live once you add a free key ·
+      <b>STUB</b> = adapter slot reserved (needs key, server relay, or format verification) ·
+      <b>LINK</b> = no lawful browser API exists; one click views it at the source. A LINK label is integrity, not laziness.</div>
+      <table><tr><th></th><th>Source</th><th>Trust tier</th><th>Status</th><th>What not to assume</th></tr>${REGISTRY.map(row).join("")}</table>`;}
+  if(curTab==="journal"){
+    const J=store.get("journal",[]);
+    B.innerHTML=`<div class="finer">TIER 7 — subjective observations, kept strictly separate from measured data, included in FULL backup. Correlation you notice here is exploratory, never proof, and never medical guidance.</div>
+      <div class="row" style="margin:6px 0"><input id="jText" placeholder="Observation (sleep, mood, headache, weather feel, prayer time, family notes…)" style="flex:1">
+      <button class="hbtn" id="jAdd">＋ Add</button></div>
+      ${J.length?`<table><tr><th>When</th><th>Observation</th><th></th></tr>`+J.slice().reverse().map((e,i)=>
+        `<tr><td class="finer">${new Date(e.t).toLocaleString()}</td><td>${esc(e.x)}</td><td><span class="del" data-jdel="${J.length-1-i}" style="cursor:pointer">✕</span></td></tr>`).join("")+"</table>":`<div class="finer">No entries yet.</div>`}`;
+    $("jAdd").addEventListener("click",()=>{const v=$("jText").value.trim();if(!v)return;
+      const J=store.get("journal",[]);J.push({t:now(),x:v});store.set("journal",J.slice(-500));renderTab();
+      ledger("Journal","","entry added (TIER 7 — subjective)","OK","USER","kept separate from measured data");});}
   if(curTab==="sources")B.innerHTML=`<div class="finer" style="line-height:1.8">
     <b style="color:var(--vir2)">Attribution & integrity.</b><br>
     Basemap © OpenStreetMap contributors (ODbL) · Radar: NOAA NEXRAD via Iowa Environmental Mesonet · Earthquakes: USGS · Weather alerts: National Weather Service · Conditions: Open-Meteo · Space weather: NOAA SWPC + NASA DONKI · Fires: NASA FIRMS · ISS: WhereTheISS.at · Aircraft: OpenSky Network · Grid: US EIA-930 · Power infrastructure: OpenStreetMap via Overpass (ODbL) · Rendering: MapLibre GL (BSD-3, vendored v5.24, license file in repo).<br><br>
@@ -862,24 +1216,113 @@ $("btnMock").addEventListener("click",()=>applyMock(!S.mock));
 $("btnRadarPlay").addEventListener("click",()=>{if(!LAYERS.radar.on){LAYERS.radar.on=true;applyLayerVisibility();renderLayerList();}radarPlay(true);});
 $("btnRadarPause").addEventListener("click",()=>radarPlay(!radarPlaying));
 $("btnScanPower").addEventListener("click",scanPower);
+/* ============== KEY VAULT + BACKUP (export/import as ONE file) ============== */
+const KEYFIELDS=[
+ ["firmsKey","NASA FIRMS (fires) — free: firms.modaps.eosdis.nasa.gov/api"],
+ ["eiaKey","EIA (grid demand + power flow) — free: eia.gov/opendata/register.php"],
+ ["nasaKey","NASA api.nasa.gov (DONKI) — DEMO_KEY works, rate-limited"],
+ ["tomtomKey","TomTom (road traffic tiles) — free tier: developer.tomtom.com"],
+ ["aisKey","AISStream (ship positions) — free: aisstream.io"]];
+function download(name,obj){const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(obj,null,2)],{type:"application/json"}));
+  a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000);}
+function exportKeys(){download("sentinel-keys.json",{type:"sentinel-keys",v:3,
+  keys:Object.fromEntries(KEYFIELDS.map(([k])=>[k,cfg[k]||""]))});
+  ledger("Vault","","keys exported to file — guard that file like a password","OK","OFFICIAL","");}
+function exportBackup(){download("sentinel-backup.json",{type:"sentinel-backup",v:3,
+  keys:Object.fromEntries(KEYFIELDS.map(([k])=>[k,cfg[k]||""])),
+  home:cfg.home,basemap:cfg.basemap||"osm",
+  bookmarks:store.get("bookmarks",[]),presets:store.get("presets",{}),startup:store.get("startup",""),
+  journal:store.get("journal",[]),
+  layers:Object.fromEntries(Object.entries(LAYERS).map(([k,L])=>[k,L.on]))});
+  ledger("Vault","","FULL backup exported (keys + bookmarks + presets + layout)","OK","OFFICIAL","");}
+function importFile(cb){const i=document.createElement("input");i.type="file";i.accept=".json,application/json";
+  i.onchange=()=>{const f=i.files[0];if(!f)return;const r=new FileReader();
+    r.onload=()=>{try{cb(JSON.parse(r.result));}catch(e){alert("Not a valid Sentinel file: "+e.message);}};
+    r.readAsText(f);};i.click();}
+function applyImport(j){
+  if(j.type!=="sentinel-keys"&&j.type!=="sentinel-backup"){alert("Not a Sentinel keys/backup file.");return;}
+  if(j.keys)KEYFIELDS.forEach(([k])=>{if(typeof j.keys[k]==="string"){cfg[k]=j.keys[k];store.set(k,cfg[k]);}});
+  if(j.type==="sentinel-backup"){
+    if(j.home&&isFinite(j.home.lat)){cfg.home=j.home;store.set("home",j.home);}
+    if(j.basemap){cfg.basemap=j.basemap;store.set("basemap",j.basemap);try{setBasemap(j.basemap);}catch(e){}}
+    if(Array.isArray(j.bookmarks))store.set("bookmarks",j.bookmarks);
+    if(j.presets&&typeof j.presets==="object")store.set("presets",j.presets);
+    if(typeof j.startup==="string")store.set("startup",j.startup);
+    if(Array.isArray(j.journal))store.set("journal",j.journal);
+    if(j.layers)for(const k in j.layers)if(LAYERS[k])LAYERS[k].on=!!j.layers[k];
+    applyLayerVisibility();renderBookmarks();renderPresets();}
+  renderLayerList();runAll(true);
+  ledger("Vault","","import applied ("+j.type+")","OK","OFFICIAL","validated shape before applying");}
 $("btnSettings").addEventListener("click",()=>{
-  $("modal").innerHTML=`<h3>⚙ Settings — keys stay in YOUR browser only</h3>
-  <label>NASA FIRMS MAP_KEY (fires) — free at firms.modaps.eosdis.nasa.gov/api</label><input id="setFirms" value="${esc(cfg.firmsKey)}">
-  <label>EIA API key (grid, ALL balancing authorities) — free at eia.gov/opendata/register.php</label><input id="setEia" value="${esc(cfg.eiaKey)}">
-  <label>NASA api.nasa.gov key (DONKI) — DEMO_KEY works but is rate-limited</label><input id="setNasa" value="${esc(cfg.nasaKey)}">
-  <label>Home watch zone (ZIP / city / lat,lon)</label><input id="setHome" value="" placeholder="${esc(cfg.home.name)}">
+  $("modal").innerHTML=`<h3>⚙ Key Vault &amp; Settings — everything stays in YOUR browser</h3>
+  ${KEYFIELDS.map(([k,lbl])=>`<label>${lbl}</label><input id="set_${k}" value="${esc(cfg[k]||"")}">`).join("")}
+  <label>Home watch zone (ZIP / city / landmark / lat,lon)</label><input id="setHome" value="" placeholder="${esc(cfg.home.name)}">
+  <div class="row">
+    <button class="hbtn" id="btnExpKeys" title="One file with all keys — move it to any machine">⇩ Export keys</button>
+    <button class="hbtn" id="btnExpAll" title="Keys + bookmarks + presets + layout in one file">⇩ Export FULL backup</button>
+    <button class="hbtn" id="btnImp" title="Load a sentinel-keys or sentinel-backup file">⇧ Import file</button></div>
+  <div class="finer">The exported file contains your keys in plain text — treat it like a password file.</div>
   <div class="row"><button class="hbtn" id="setCancel">CANCEL</button><button class="hbtn on" id="setSave">SAVE</button></div>`;
   $("modalBack").classList.add("open");
+  $("btnExpKeys").addEventListener("click",exportKeys);
+  $("btnExpAll").addEventListener("click",exportBackup);
+  $("btnImp").addEventListener("click",()=>importFile(j=>{applyImport(j);$("modalBack").classList.remove("open");}));
   $("setCancel").addEventListener("click",()=>$("modalBack").classList.remove("open"));
   $("setSave").addEventListener("click",async()=>{
-    cfg.firmsKey=$("setFirms").value.trim();cfg.eiaKey=$("setEia").value.trim();
-    cfg.nasaKey=$("setNasa").value.trim()||"DEMO_KEY";
+    KEYFIELDS.forEach(([k])=>{cfg[k]=$("set_"+k).value.trim();store.set(k,cfg[k]);});
+    if(!cfg.nasaKey)cfg.nasaKey="DEMO_KEY",store.set("nasaKey","DEMO_KEY");
     const hq=$("setHome").value.trim();
     if(hq){const loc=await geocode(hq);if(loc){cfg.home=loc;store.set("home",loc);}}
-    store.set("firmsKey",cfg.firmsKey);store.set("eiaKey",cfg.eiaKey);store.set("nasaKey",cfg.nasaKey);
     $("modalBack").classList.remove("open");
     ledger("Settings","","saved — keys stored locally only","OK","OFFICIAL","");
     renderLayerList();runAll(true);});});
+
+/* ============== BOOKMARKS ============== */
+function renderBookmarks(){const b=store.get("bookmarks",[]);
+  $("bkList").innerHTML=b.length?b.map((x,i)=>`<div class="bkrow" data-bk="${i}">
+    <span class="star2">★</span><span>${esc(x.name)}</span><span class="del" data-bkdel="${i}" title="remove">✕</span></div>`).join("")
+    :"None yet — search a place, then press ★";}
+$("btnStar").addEventListener("click",()=>{const b=store.get("bookmarks",[]);
+  if(b.some(x=>x.name===S.loc.name)){return;}
+  b.push({name:S.loc.name,lat:S.loc.lat,lon:S.loc.lon});store.set("bookmarks",b);renderBookmarks();
+  ledger("Bookmarks","","saved: "+S.loc.name,"OK","OFFICIAL","stored locally; in FULL backup export");});
+document.addEventListener("click",e=>{
+  const d=e.target.closest("[data-bkdel]");
+  if(d){const b=store.get("bookmarks",[]);b.splice(+d.dataset.bkdel,1);store.set("bookmarks",b);renderBookmarks();e.stopPropagation();return;}
+  const r=e.target.closest("[data-bk]");
+  if(r){const b=store.get("bookmarks",[]);const x=b[+r.dataset.bk];if(x){setLocation(x);map.flyTo({center:[x.lon,x.lat],zoom:9});}}});
+
+/* ============== PRESETS (profiles) + STARTUP ============== */
+function capturePreset(){const c=map.getCenter();return{
+  layers:Object.fromEntries(Object.entries(LAYERS).map(([k,L])=>[k,L.on])),
+  basemap:cfg.basemap||"osm",center:[+c.lng.toFixed(3),+c.lat.toFixed(3)],zoom:+map.getZoom().toFixed(2),
+  focus:document.body.classList.contains("focus"),ambient:S.ambient,integrity:S.integrity};}
+function applyPreset(p){if(!p)return;
+  if(p.layers)for(const k in p.layers)if(LAYERS[k])LAYERS[k].on=!!p.layers[k];
+  applyLayerVisibility();renderLayerList();
+  if(p.basemap){try{setBasemap(p.basemap);}catch(e){}}
+  if(p.center)map.jumpTo({center:p.center,zoom:p.zoom||3});
+  document.body.classList.toggle("focus",!!p.focus);$("btnFocus").classList.toggle("on",!!p.focus);
+  if(!!p.ambient!==S.ambient)setAmbient(!!p.ambient);
+  if(!!p.integrity!==S.integrity)$("btnIntegrity").click();
+  setTimeout(()=>map.resize(),60);}
+function renderPresets(){const ps=store.get("presets",{}),boot=store.get("startup","");
+  const names=Object.keys(ps);
+  $("presetList").innerHTML=names.length?names.map(n=>`<div class="prerow">
+    <span class="apply" data-pre="${esc(n)}" title="apply">▶ ${esc(n)}</span>
+    <span class="boot ${boot===n?"on":""}" data-preboot="${esc(n)}" title="use at startup">✦</span>
+    <span class="del" data-predel="${esc(n)}" title="delete">✕</span></div>`).join("")
+    :"None yet";}
+$("btnSavePreset").addEventListener("click",()=>{
+  const n=prompt("Name this preset (e.g. North Texas Watch, TV Wall):");if(!n)return;
+  const ps=store.get("presets",{});ps[n.trim()]=capturePreset();store.set("presets",ps);renderPresets();
+  ledger("Presets","","saved preset: "+n,"OK","OFFICIAL","in FULL backup export");});
+document.addEventListener("click",e=>{
+  const a=e.target.closest("[data-pre]");if(a){applyPreset(store.get("presets",{})[a.dataset.pre]);return;}
+  const b=e.target.closest("[data-preboot]");if(b){const cur=store.get("startup","");
+    store.set("startup",cur===b.dataset.preboot?"":b.dataset.preboot);renderPresets();return;}
+  const d=e.target.closest("[data-predel]");if(d){const ps=store.get("presets",{});delete ps[d.dataset.predel];store.set("presets",ps);renderPresets();}});
 $("modalBack").addEventListener("click",e=>{if(e.target.id==="modalBack")$("modalBack").classList.remove("open");});
 
 /* =====================================================================
@@ -934,6 +1377,47 @@ setInterval(()=>{if(map.getSource("night"))gj("night");},120000);
 /* boot */
 ledger("Sentinel Globe","","v2 started · MapLibre globe · no telemetry","OK","OFFICIAL","3 files, all vendored, auditable");
 renderLayerList();renderTab();watchdogSweep();
+/* ---- Views: globe / polar top-down (azimuthal perspective, honestly derived from the globe) ---- */
+$("btnViewGlobe").addEventListener("click",()=>map.easeTo({center:[cfg.home.lon,35],zoom:2.4,pitch:0,bearing:0,duration:1600}));
+$("btnViewPolar").addEventListener("click",()=>{map.easeTo({center:[cfg.home.lon,89.5],zoom:1.5,pitch:0,bearing:0,duration:1800});
+  ledger("View","","polar top-down — the azimuthal-equidistant perspective, generated live from the globe","OK","OFFICIAL","see ⓘ Views for what this teaches");});
+
+/* ---- Fault click popup ---- */
+map.on("click","fault-lines",e=>{const p=e.features[0].properties;
+  new maplibregl.Popup().setLngLat(e.lngLat).setHTML(
+    `<b>${esc(p.n||"Unnamed fault")}</b><br>Slip type: ${esc(p.s||"not recorded")}<br><span style="font-size:10px">GEM Global Active Faults — documented active fault, not a prediction</span>`).addTo(map);});
+
+/* ---- Sky & Eclipse Lab ---- */
+const ECLIPSES=[["2026 Feb 17","Annular solar","Antarctica"],["2026 Mar 3","Total lunar","Asia, Pacific, Americas"],
+ ["2026 Aug 12","Total solar","Arctic, Greenland, Iceland, N. Spain"],["2026 Aug 28","Partial lunar","Americas, Europe, Africa"],
+ ["2027 Feb 6","Annular solar","S. America, Atlantic, W. Africa"],["2027 Aug 2","Total solar","N. Africa, Middle East — ~6 min totality, exceptionally long"],
+ ["2028 Jan 26","Annular solar","S. America, Atlantic, Iberia"],["2028 Jul 22","Total solar","Australia, New Zealand"]];
+function openSkyLab(){
+  const m=moonInfo(); // phase 0=new … 0.5=full
+  const ang=(m.phase!==undefined?m.phase:0.5)*2*Math.PI; // moon angle around Earth, sun to the left
+  const mx=170+80*Math.cos(ang+Math.PI), my=110+80*Math.sin(ang+Math.PI);
+  $("modal").innerHTML=`<h3>☾ Sky &amp; Eclipse Lab <button class="ibtn" data-info="sky">i</button></h3><div class="infobody">
+  <svg viewBox="0 0 340 220" style="width:100%;background:#04120c;border-radius:8px">
+    <circle cx="28" cy="110" r="22" fill="#e0b24b"/><text x="28" y="150" fill="#e0b24b" font-size="10" text-anchor="middle">Sun →</text>
+    <circle cx="170" cy="110" r="80" fill="none" stroke="#2a4a3e" stroke-dasharray="3 4"/>
+    <circle cx="170" cy="110" r="14" fill="#3a6a9a"/><text x="170" y="145" fill="#9fb8ae" font-size="10" text-anchor="middle">Earth</text>
+    <circle cx="${mx.toFixed(0)}" cy="${my.toFixed(0)}" r="6" fill="#cfd8d4"/>
+    <text x="${mx.toFixed(0)}" y="${(my-12).toFixed(0)}" fill="#cfd8d4" font-size="10" text-anchor="middle">Moon</text>
+  </svg>
+  <div class="sec"><b>Today:</b> ${esc(m.name)}, ${m.illum}% illuminated. The lit fraction you see is simply the angle between Sun, Earth, and Moon above — no shadow of Earth is involved in ordinary phases (a common misconception).</div>
+  <div class="sec"><b>Why eclipses are rare:</b> a solar eclipse needs a NEW moon exactly between Sun and Earth; a lunar eclipse needs a FULL moon passing through Earth's shadow. The Moon's orbit is tilted ~5° to Earth's orbital plane, so most months the alignment misses high or low. Only when new/full moon coincides with a plane crossing (a node) do you get an eclipse — roughly 4–7 per year worldwide, most partial.</div>
+  <div class="sec"><b>Upcoming eclipses</b> (published NASA ephemerides — verify at eclipse.gsfc.nasa.gov):<br>
+  ${ECLIPSES.map(e=>`<div style="padding:2px 0"><b>${e[0]}</b> — ${e[1]} — <span class="finer">${e[2]}</span></div>`).join("")}</div>
+  <div class="sec finer">Diagram is schematic, not to scale: at true scale the Moon sits ~30 Earth-diameters away. Star/constellation view is Phase 3 (planetarium engine); meanwhile stellarium-web.org (open source) is excellent.</div>
+  <div class="row"><button class="hbtn" onclick="document.getElementById('modalBack').classList.remove('open')">CLOSE</button></div></div>`;
+  $("modalBack").classList.add("open");}
+document.addEventListener("click",e=>{if(e.target.closest("#btnSkyLab"))openSkyLab();});
+
+/* ---- boot: bookmarks, presets, startup profile ---- */
+renderBookmarks();renderPresets();
+map.on("load",()=>{const boot=store.get("startup","");
+  if(boot){const p=store.get("presets",{})[boot];
+    if(p){setTimeout(()=>{applyPreset(p);ledger("Presets","","startup preset applied: "+boot,"OK","OFFICIAL","");},900);}}});
 setTimeout(()=>runAll(true),400);
 </script>
 </body>
