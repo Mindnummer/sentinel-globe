@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="maplibre-gl.css">
 <script src="maplibre-gl.js"></script>
 <script src="satellite.min.js"></script>
+<link rel="manifest" href="manifest.webmanifest">
 <style>
 /* ============ SENTINEL GLOBE v2 — viridian command center ============
    3 files: index.html + vendored maplibre-gl.js/.css (pinned v5.24, ODbL/OSM basemap).
@@ -52,6 +53,9 @@ h2{font-size:11px;letter-spacing:2px;color:var(--vir2);margin:10px 0 6px;text-tr
 h2:first-child{margin-top:0}
 /* ---------- map ---------- */
 #mapWrap{grid-area:map;position:relative;background:#050a08}
+#coordChip{position:absolute;left:8px;bottom:6px;z-index:26;font-size:10.5px;color:#9fb8ae;
+  background:#04120ccc;border:1px solid #163026;border-radius:8px;padding:2px 8px;cursor:pointer;user-select:none}
+#coordChip:hover{color:#7fe0bd}
 #map{position:absolute;inset:0}
 #mockBanner{display:none;position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:40;
   background:var(--mock);color:#1a0a24;font-weight:800;font-size:12px;letter-spacing:1px;
@@ -186,7 +190,11 @@ body.focus #feedBar{display:none}
   </div>
   <h2>Views <button class="ibtn" data-info="polar">i</button></h2>
   <div id="bmRow">
-    <button class="hbtn" id="btnViewGlobe">🌐 Globe</button><button class="hbtn" id="btnViewPolar">🧭 Polar top-down</button>
+    <button class="hbtn" id="btnViewGlobe">🌐 Globe</button><button class="hbtn" id="btnViewFlat">🗺 Flat world</button>
+    <button class="hbtn" id="btnAELab">◎ AE Map Lab</button>
+  </div>
+  <div class="finer" style="margin:2px 0">Orbit speed <input type="range" id="orbitSpeed" min="0.2" max="8" step="0.2" value="1" style="width:60%;vertical-align:middle"> <span id="orbitSpeedV">1×</span></div>
+  <div class="finer">Performance <button class="hbtn" id="btnPerf" style="padding:2px 8px;font-size:10px">AUTO</button> <button class="ibtn" data-info="perf">i</button>
   </div>
   <h2>Layers <button class="ibtn" data-info="layers">i</button></h2>
   <div id="layerList"></div>
@@ -262,7 +270,7 @@ const cfg={
 };
 const S={loc:cfg.home, mock:false, integrity:false, ambient:false,
          quakes:[], fires:[], aircraft:[], alerts:[], donki:[], ba:{}, power:null,
-         ships:{}, sats:[], flows:[],
+         ships:{}, sats:[], flows:[], issTrack:[], issRec:null,
          kp:null, wind:null, xray:null, iss:null, issTrail:[], meteo:null, anomalies:[]};
 const haversine=(a,b,c,d)=>{const R=6371,r=x=>x*Math.PI/180;
   const h=Math.sin(r(c-a)/2)**2+Math.cos(r(a))*Math.cos(r(c))*Math.sin(r(d-b)/2)**2;
@@ -323,6 +331,10 @@ ledger:{t:"Truth Ledger",w:"An append-only log of every fetch this session: sour
 sources:{t:"Sources & Integrity",w:"The registry of every data source with its terms posture, refresh rate, and honest limitations, plus this app's standing integrity rules.",s:"Internal",f:"—",c:"—",l:"—"},
 notif:{t:"Notifications",w:"When ON, your browser notifies you even in another tab for: new official NWS alerts at your home location, quakes M4.5+ within ~300 mi of home, Kp reaching 6+ (strong geomagnetic storm), or a fire detection within ~50 mi of home. Each event notifies once (deduplicated).",s:"Rules run locally on the same public feeds",f:"Evaluated every refresh cycle",c:"mixed, per underlying source",l:"Only works while the tab is open (a PWA/service-worker version is Phase 3). Browser must grant permission. This is convenience, not a life-safety system — a NOAA weather radio does not depend on your browser."},
 modes:{t:"Header Modes",w:"AMBIENT = slow, beautiful globe auto-rotation for leaving on a wall screen; touching the map pauses it. INTEGRITY = hides anything mock, experimental, or low-confidence — only verified live data remains. MOCK = clearly-banner-labeled sample data for testing the interface. 🔔 = browser notifications for your home watch zone. ◱ FOCUS = hides every panel so the map alone fills the window. ⛶ = true fullscreen (press Esc to exit). Stack all three — Fullscreen + Focus + Ambient — for a wall display.",s:"—",f:"—",c:"—",l:"MOCK and live can never mix silently: the Watchdog flags RED if mock items appear outside Mock mode."},
+views:{t:"Views: Globe, Flat World, AE Lab",w:"Globe = the true 3D sphere (drag with right-click/two fingers to pitch it). Flat World switches the SAME data to a Mercator flat map — turn on the ISS layer and its dashed ground track draws the famous NASA wave. The wave is a perfectly regular orbit drawn on a flattened sphere: the projection makes the wave, not the spacecraft. ◎ AE Map Lab opens the azimuthal-equidistant map — the projection the UN emblem and Flat-Earth maps use — drawn live from real coastline data with the real ISS position, so you can see exactly how flattening a sphere from the pole stretches the south.",s:"Same data, three honest projections",f:"—",c:"—",l:"Every flat map of Earth distorts something; that is a mathematical theorem (Gauss), not an opinion. The AE Lab shows Antarctica smeared into a ring — the projection doing it in front of you."},
+perf:{t:"Performance Modes",w:"AUTO senses your device (memory/cores) and picks; LOW renders at 1× scale and drops the densest labels for phones and weak laptops; HIGH is full quality. The genuinely heavy layers, in order: Satellites (SGP4 math for hundreds of objects), Radar Loop (12 tile textures), Fault Lines (13,696 lines), Starlink group. Toggle those off first if anything stutters.",s:"—",f:"—",c:"—",l:"AUTO's device sensing is approximate — browsers deliberately fuzz hardware info."},
+customkeys:{t:"Your Own Keys",w:"A place to store ANY API key you find, with your own label. Saved locally, included in key export and FULL backup. When a future adapter needs that provider, the key is already waiting — no rebuild needed.",s:"You",f:"—",c:"—",l:"Storing a key does not create an adapter — data starts flowing when an adapter for that provider exists. Ask and it gets built into the next version."},
+coords:{t:"Coordinates Readout",w:"The chip at the bottom-left shows the latitude, longitude under your cursor live; click the chip to copy. Right-click anywhere on the map for a popup with the exact coordinates, a Copy button, and ★ Bookmark here.",s:"Computed from the map view",f:"Live",c:"—",l:"Displayed to 5 decimals ≈ 1 meter of precision — far finer than most of the data layers themselves."},
 registry:{t:"Source Registry",w:"Every lawful source this app knows about — grid and earth-field — with a trust tier (1 official operational … 7 user journal) and an honest adapter status. LIVE flows into the app now; KEYED needs your free key; STUB is a reserved adapter slot; LINK means no lawful browser API exists and one click opens the official source. Labeling something LINK instead of faking a feed is the integrity rule working, not a shortcut.",s:"Compiled from your expansion specification; each row links its source",f:"Static registry, updated with app versions",c:"—",l:"A trust tier rates the SOURCE class, not any individual reading. Tier-5 mirrors (e.g. Schumann dashboards) can be right — but you cannot verify it from the mirror alone, which is exactly why they are tier 5."},
 journal:{t:"User Journal (Tier 7)",w:"Your own observations — sleep, mood, headaches, weather feel, prayer times, family notes. Stored locally, included in FULL backup, and kept strictly separate from measured data so subjective notes can never contaminate telemetry.",s:"You",f:"Whenever you write",c:"TIER 7 — subjective",l:"Any pattern you notice between journal entries and earth-field data is exploratory correlation with a sample size of one household. It is not proof, not diagnosis, and not medical guidance — and this app will never present it as such."},
 imf:{t:"IMF Bz / Bt",w:"The interplanetary magnetic field carried by the solar wind, measured at the DSCOVR spacecraft. Bt = total strength; Bz = the north-south component. When Bz points SOUTH (negative) for hours, it links up with Earth's field and lets solar-wind energy pour in — that is the main switch for geomagnetic storms. Northward Bz mostly deflects the flow.",s:"NOAA SWPC / DSCOVR at L1",f:"~1-min data, fetched every 5 min",c:"MEASURED",l:"L1 is 15–60 min upstream of Earth depending on wind speed. A single negative spike means little; duration is what matters."},
@@ -332,7 +344,7 @@ flow:{t:"Power Flow Between BAs",w:"Animated lines showing electricity interchan
 traffic:{t:"Road Traffic",w:"Live road congestion painted on the map — green flowing, orange slow, red jammed — down to individual streets when zoomed in. Free TomTom key required (⚙ Key Vault).",s:"TomTom Traffic Flow tiles",f:"Updated continuously by TomTom from GPS probe data",c:"MEASURED",l:"Free tier ≈2,500 tile loads/day — plenty for personal use, and the Watchdog notes if it stops. Relative speeds only; no vehicle counts; no historical replay on the free tier. Coverage best on paved public roads."},
 ships:{t:"Ships / AIS",w:"Live vessel positions from AIS radio broadcasts, streamed over a websocket for the area you are viewing. Click a ship for name, speed, and course. Free AISStream key required (⚙ Key Vault).",s:"aisstream.io (volunteer terrestrial AIS receivers)",f:"Continuous stream; positions seconds to minutes old",c:"MEASURED",l:"Terrestrial receivers reach ~40 nautical miles offshore — coastal and port coverage is good, open-ocean coverage is NOT (that requires paid satellite AIS). Ships can and do turn transponders off. Capped at 1,500 vessels in memory."},
 sats:{t:"Satellites & Debris",w:"Real orbital objects propagated from published orbits: space stations, weather satellites, Starlink, and cataloged debris from the 2009 Cosmos-2251 collision. Positions recompute every 8 seconds using SGP4 — the same math professionals use.",s:"CelesTrak general-perturbations data; SGP4 via satellite.js (vendored)",f:"Orbits updated by CelesTrak roughly daily; positions recomputed live",c:"MODELED positions from MEASURED orbits — accuracy is km-scale and degrades as the orbit data ages (age shown after loading)",l:"Capped at 400 objects per group so your device stays smooth; the full public catalog is ~27,000 objects. There is NO public live video feed of satellites — anything claiming to be one is an animation, including this one: these are computed positions, honestly labeled."},
-polar:{t:"Views: Globe & Polar",w:"Globe = the standard 3D Earth. Polar top-down looks straight down at the North Pole — this is exactly the perspective behind the UN emblem and azimuthal-equidistant 'flat' world maps. Seeing it generated live from a sphere is the best teaching tool for why those maps look the way they do: they are projections OF the globe, with distortion growing toward the south.",s:"—",f:"—",c:"—",l:"A true flat azimuthal-equidistant projection is not supported by this map engine; the top-down globe view gives the same visual perspective honestly. Antarctica appears at the outer edge, stretched — that is the projection distorting, not the Earth."},
+polar_removed_legacy:{t:"(removed)",w:"Globe = the standard 3D Earth. Polar top-down looks straight down at the North Pole — this is exactly the perspective behind the UN emblem and azimuthal-equidistant 'flat' world maps. Seeing it generated live from a sphere is the best teaching tool for why those maps look the way they do: they are projections OF the globe, with distortion growing toward the south.",s:"—",f:"—",c:"—",l:"A true flat azimuthal-equidistant projection is not supported by this map engine; the top-down globe view gives the same visual perspective honestly. Antarctica appears at the outer edge, stretched — that is the projection distorting, not the Earth."},
 bookmarks:{t:"Bookmarks",w:"Star any searched location to save it. Click a bookmark to fly there and load its Local Brief. Included in the FULL backup export.",s:"Stored in your browser only",f:"—",c:"—",l:"—"},
 presets:{t:"Presets (profiles)",w:"Save your entire current view — layers on/off, basemap, position, zoom, Focus/Orbit/Integrity state — under a name. ▶ applies it. ✦ marks it as your STARTUP preset: the app will open exactly that way every time. Included in the FULL backup export.",s:"Stored in your browser only",f:"—",c:"—",l:"Startup preset applies after the map finishes loading (about a second)."},
 sky:{t:"Sky & Eclipse Lab",w:"A teaching panel: the current Sun–Earth–Moon geometry drawn to explain today's moon phase, why eclipses happen only when a new or full moon crosses Earth's orbital plane (the ~5° tilt is why there isn't an eclipse every month), and the table of upcoming eclipses.",s:"Phase computed locally; eclipse dates from published NASA ephemerides — verify at eclipse.gsfc.nasa.gov",f:"Live for phase; eclipse table is fixed future dates",c:"MODELED (phase) / OFFICIAL (eclipse dates)",l:"Diagram is schematic — sizes and distances are not to scale (to scale, the Moon would be 30 Earth-diameters away and invisible at this size). Star/constellation rendering is not included yet; it needs a planetarium engine (Phase 3 — d3-celestial is the open-source candidate). Meanwhile Stellarium Web (stellarium-web.org, open source) does it excellently."},
@@ -384,21 +396,29 @@ function nightPolygon(){ // polygon of the night hemisphere for the terminator l
 async function geocode(q){
   q=q.trim();if(!q)return null;
   const m=q.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
-  if(m)return{name:`${m[1]}, ${m[2]}`,lat:+m[1],lon:+m[2]};
+  if(m)return{name:`${m[1]}, ${m[2]}`,lat:+m[1],lon:+m[2],z:14};
   try{
+    const looksAddress=/\d/.test(q)&&/[a-zA-Z]/.test(q)&&!/^\d{5}$/.test(q);
+    if(looksAddress){
+      const ra=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=jsonv2&limit=1&addressdetails=0`);
+      if(ra.ok){const ja=await ra.json();if(ja[0]){
+        ledger("Nominatim (OSM)","nominatim.openstreetmap.org","geocoded address "+q,"OK","OFFICIAL","OSM completeness varies; rural addresses may resolve to the road");
+        return{name:ja[0].display_name.split(",").slice(0,3).join(","),lat:+ja[0].lat,lon:+ja[0].lon,z:17.8};}}}
     if(/^\d{5}$/.test(q)){
       const r=await fetch(`https://api.zippopotam.us/us/${q}`);if(r.ok){const j=await r.json();const p=j.places[0];
       ledger("Zippopotam","api.zippopotam.us","geocoded ZIP "+q,"OK","OFFICIAL","ZIP centroid, not street-level");
-      return{name:`${p["place name"]}, ${p["state abbreviation"]} ${q}`,lat:+p.latitude,lon:+p.longitude};}}
+      return{name:`${p["place name"]}, ${p["state abbreviation"]} ${q}`,lat:+p.latitude,lon:+p.longitude,z:11.5};}}
     const r=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=1`);
     if(r.ok){const j=await r.json();if(j.results&&j.results[0]){const g=j.results[0];
       ledger("Open-Meteo Geocoder","geocoding-api.open-meteo.com","geocoded "+q,"OK","OFFICIAL","place centroid");
-      return{name:`${g.name}, ${g.admin1||""} ${g.country_code||""}`.trim(),lat:g.latitude,lon:g.longitude};}}
+      return{name:`${g.name}, ${g.admin1||""} ${g.country_code||""}`.trim(),lat:g.latitude,lon:g.longitude,z:10.5};}}
     // Landmark fallback: "Mount Everest", "Statue of Liberty", "Eiffel Tower"…
     const rn=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=jsonv2&limit=1`);
     if(rn.ok){const jn=await rn.json();if(jn[0]){
       ledger("Nominatim (OSM)","nominatim.openstreetmap.org","geocoded landmark "+q,"OK","OFFICIAL","OSM data; 1 req/s fair-use");
-      return{name:jn[0].display_name.split(",").slice(0,2).join(","),lat:+jn[0].lat,lon:+jn[0].lon};}}
+      const at=jn[0].addresstype||jn[0].type||"";
+      const z=/house|building|amenity|residential|address/.test(at)?17.8:/road|street/.test(at)?16:/suburb|neighbourhood/.test(at)?14:/city|town|village/.test(at)?11.5:/county/.test(at)?9:6.5;
+      return{name:jn[0].display_name.split(",").slice(0,2).join(","),lat:+jn[0].lat,lon:+jn[0].lon,z};}}
   }catch(e){ledger("Geocoder","", "failed: "+e.message,"FAIL","UNAVAILABLE","");wd("geocode","bad",e.message);}
   return null;}
 
@@ -488,6 +508,8 @@ const SRC={ // each returns fresh GeoJSON from state
     properties:{code:b.code,name:b.name,d:b.d,df:b.df,stress:b.df?b.d/b.df:null,period:b.period}}))}),
   power:()=>S.power||EMPTY,
   night:()=>nightPolygon(),
+  isstrack:()=>({type:"FeatureCollection",features:S.issTrack.length?[{type:"Feature",properties:{},
+    geometry:{type:"MultiLineString",coordinates:S.issTrack}}]:[]}),
   ships:()=>({type:"FeatureCollection",features:Object.values(S.ships).map(v=>({type:"Feature",
     geometry:{type:"Point",coordinates:[v.lon,v.lat]},properties:{name:v.name||("MMSI "+v.mmsi),sog:v.sog,cog:v.cog}}))}),
   sats:()=>({type:"FeatureCollection",features:S.sats.map(s=>({type:"Feature",
@@ -503,6 +525,8 @@ map.on("load",()=>{
     paint:{"line-color":["case",["<",["get","mw"],0],"#e0b24b","#7fe0bd"],
       "line-width":["interpolate",["linear"],["abs",["get","mw"]],25,1,2000,3.5,8000,7],
       "line-opacity":0.8,"line-dasharray":["literal",[0,2,3]]}});
+  map.addLayer({id:"isstrack",type:"line",source:"isstrack",
+    paint:{"line-color":"#7fd4ff","line-opacity":0.55,"line-width":1.6,"line-dasharray":[2,2]}});
   map.addLayer({id:"ships",type:"circle",source:"ships",layout:{visibility:"none"},
     paint:{"circle-color":"#5bb8d9","circle-radius":["interpolate",["linear"],["zoom"],3,2,10,5],
       "circle-stroke-color":"#04120c","circle-stroke-width":1}});
@@ -580,12 +604,12 @@ function radarPlay(on){
 /* ---------- ambient rotation: the always-on beautiful globe ---------- */
 let ambientRAF=null,lastInteract=0,userBusy=false;
 // FIX: track interaction END, not just start — trackpad inertia used to re-arm the pause forever.
-["dragstart","zoomstart","rotatestart","pitchstart"].forEach(ev=>map.on(ev,()=>{userBusy=true;lastInteract=now();}));
-["dragend","zoomend","rotateend","pitchend"].forEach(ev=>map.on(ev,()=>{userBusy=false;lastInteract=now();}));
+["dragstart","zoomstart","rotatestart","pitchstart"].forEach(ev=>map.on(ev,e=>{if(e&&e.originalEvent){userBusy=true;lastInteract=now();}}));
+["dragend","zoomend","rotateend","pitchend"].forEach(ev=>map.on(ev,e=>{if(e&&e.originalEvent){userBusy=false;lastInteract=now();}}));
 function ambientTick(){
   if(!S.ambient){ambientRAF=null;return;}
-  if(!userBusy&&!map.isMoving()&&now()-lastInteract>6000&&!document.hidden){
-    const c=map.getCenter();map.setCenter([c.lng+0.045,c.lat*0.999]); } // resumes 6 s after you let go — no re-toggle needed
+  if(!userBusy&&!map.isMoving()&&now()-lastInteract>2500&&!document.hidden){
+    const c=map.getCenter();map.setCenter([c.lng+0.045*(cfg.orbitSpeed||1),c.lat*0.999]); } // resumes 2.5 s after you let go; speed slider in Views
   ambientRAF=requestAnimationFrame(ambientTick);}
 function setAmbient(on){S.ambient=on;$("btnAmbient").classList.toggle("on",on);
   if(on){if(map.getZoom()>4.2)map.easeTo({zoom:2.6,pitch:0,duration:1800});
@@ -645,6 +669,7 @@ const LAYERS={
   sats:{name:"Satellites & Debris (pick groups below)",color:"#c9b8ff",on:false,badge:"MODELED",info:"sats",maps:["sats"]},
 };
 function applyLayerVisibility(){
+  try{if(map.getLayer("isstrack"))map.setLayoutProperty("isstrack","visibility",LAYERS.iss&&LAYERS.iss.on?"visible":"none");}catch(e){}
   for(const k in LAYERS){const L=LAYERS[k];
     (L.maps||[]).forEach(m=>{if(map.getLayer(m))map.setLayoutProperty(m,"visibility",L.on?"visible":"none");});}
   if(LAYERS.radar.on&&!radarPlaying)radarShow(RADAR_FRAMES.length-1);
@@ -731,6 +756,28 @@ function rebuildSats(){
       const gd=satellite.eciToGeodetic(pv.position,gmst);
       out.push({name:s.name,grp:g,lat:satellite.degreesLat(gd.latitude),lon:satellite.degreesLong(gd.longitude),alt:gd.height});}catch(e){}}
   S.sats=out;gj("sats");}
+
+/* ---- ISS ground track: real TLE + SGP4, split at the date line so the "NASA wave" draws cleanly ---- */
+async function updateIssTrack(){
+  if(!LAYERS.iss||!LAYERS.iss.on||typeof satellite==="undefined")return;
+  try{
+    if(!S.issRec||now()-(S.issRec.t||0)>216e5){
+      const r=await fetch("https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=tle");
+      if(!r.ok)throw new Error("HTTP "+r.status);
+      const L=(await r.text()).split(/\r?\n/).filter(x=>x.trim());
+      S.issRec={rec:satellite.twoline2satrec(L[1],L[2]),t:now()};
+      ledger("CelesTrak","celestrak.org","ISS TLE refreshed for ground track","OK","MEASURED","SGP4 propagation; km-scale accuracy");}
+    const segs=[];let seg=[];let prevLon=null;
+    for(let m=-10;m<=92;m+=1){
+      const t=new Date(now()+m*6e4),pv=satellite.propagate(S.issRec.rec,t);if(!pv.position)continue;
+      const gd=satellite.eciToGeodetic(pv.position,satellite.gstime(t));
+      const lon=satellite.degreesLong(gd.longitude),lat=satellite.degreesLat(gd.latitude);
+      if(prevLon!==null&&Math.abs(lon-prevLon)>180){if(seg.length>1)segs.push(seg);seg=[];}
+      seg.push([lon,lat]);prevLon=lon;}
+    if(seg.length>1)segs.push(seg);
+    S.issTrack=segs;gj("isstrack");
+  }catch(e){wd("iss","warn","track: "+e.message);}}
+setInterval(updateIssTrack,60000);map.on("load",()=>setTimeout(updateIssTrack,3000));
 
 /* ---- Power-flow line animation: moving dashes show direction (representation, not literal electrons) ---- */
 const FLOW_DASH=[[0,2,3],[1,2,2],[2,2,1],[3,2,0]];let flowStep=0;
@@ -840,13 +887,18 @@ opensky:{name:"Aircraft (OpenSky → adsb.fi fallback)",int:75,staleSec:400,enab
     gj("aircraft");FRESH.aircraft=now();
     ledger("OpenSky","opensky-network.org",S.aircraft.length+" aircraft in view","OK","MEASURED","anonymous tier; volunteer receiver coverage");
   }catch(e1){
-    // Automatic alternative — you asked for fallbacks on anything that fails regularly. adsb.fi is a community feed with an open API (fair use).
-    const rf=await fetch(`https://opendata.adsb.fi/api/v2/lat/${c.lat.toFixed(3)}/lon/${c.lng.toFixed(3)}/dist/150`);
-    if(!rf.ok)throw new Error("OpenSky ("+e1.message+") AND adsb.fi (HTTP "+rf.status+") both failed");
-    const jf=await rf.json();
-    S.aircraft=(jf.ac||jf.aircraft||[]).filter(a=>a.lat!=null&&a.lon!=null).map(a=>({icao:a.hex,cs:(a.flight||"").trim(),lon:a.lon,lat:a.lat,alt:a.alt_baro,vel:a.gs!=null?a.gs*0.5144:null,hdg:a.track}));
-    gj("aircraft");FRESH.aircraft=now();
-    ledger("adsb.fi (fallback)","opendata.adsb.fi",S.aircraft.length+" aircraft within 150 nm — OpenSky was unavailable","OK","MEASURED","community ADS-B feed; fair-use; coverage depends on volunteer receivers");}}},
+    // Fallback chain — three independent community/volunteer networks tried in order.
+    const mapAc=j=>(j.ac||j.aircraft||[]).filter(a=>a.lat!=null&&a.lon!=null).map(a=>({icao:a.hex,cs:(a.flight||"").trim(),lon:a.lon,lat:a.lat,alt:a.alt_baro,vel:a.gs!=null?a.gs*0.5144:null,hdg:a.track}));
+    try{
+      const rf=await fetch(`https://opendata.adsb.fi/api/v2/lat/${c.lat.toFixed(3)}/lon/${c.lng.toFixed(3)}/dist/150`);
+      if(!rf.ok)throw new Error("HTTP "+rf.status);
+      S.aircraft=mapAc(await rf.json());gj("aircraft");FRESH.aircraft=now();
+      ledger("adsb.fi (fallback 1)","opendata.adsb.fi",S.aircraft.length+" aircraft within 150 nm — OpenSky unavailable","OK","MEASURED","community ADS-B; coverage = volunteer receivers");
+    }catch(e2){
+      const r3=await fetch(`https://api.airplanes.live/v2/point/${c.lat.toFixed(3)}/${c.lng.toFixed(3)}/150`);
+      if(!r3.ok)throw new Error(`all three failed — OpenSky (${e1.message}), adsb.fi (${e2.message}), airplanes.live (HTTP ${r3.status}). See feed chip for what next.`);
+      S.aircraft=mapAc(await r3.json());gj("aircraft");FRESH.aircraft=now();
+      ledger("airplanes.live (fallback 2)","api.airplanes.live",S.aircraft.length+" aircraft within 150 nm","OK","MEASURED","community ADS-B; fair-use rate limits (~1 req/s)");}}}},
 eiaflow:{name:"EIA Interchange (power flow)",int:900,staleSec:5400,enabled:()=>!!cfg.eiaKey&&LAYERS.flow.on,offNote:"needs EIA key + Power Flow layer on",
  run:async()=>{
   const r=await fetch(`https://api.eia.gov/v2/electricity/rto/interchange-data/data/?api_key=${cfg.eiaKey}&frequency=hourly&data[0]=value&sort[0][column]=period&sort[0][direction]=desc&length=800`);
@@ -1194,7 +1246,7 @@ $("btnFocus").addEventListener("click",()=>{
    LOCATION + UI WIRES
    ===================================================================== */
 function setLocation(loc,fly=true){S.loc=loc;
-  if(fly)map.flyTo({center:[loc.lon,loc.lat],zoom:8.6,duration:2600});
+  if(fly)map.flyTo({center:[loc.lon,loc.lat],zoom:loc.z||8.6,duration:2600});
   ledger("Location","",'focused: '+loc.name,"OK","OFFICIAL","");
   runAdapter("alerts",true);runAdapter("meteo",true);runAdapter("firms",true);
   setTimeout(()=>{runAnomalyEngine();renderAll();},1500);}
@@ -1233,7 +1285,7 @@ function exportBackup(){download("sentinel-backup.json",{type:"sentinel-backup",
   keys:Object.fromEntries(KEYFIELDS.map(([k])=>[k,cfg[k]||""])),
   home:cfg.home,basemap:cfg.basemap||"osm",
   bookmarks:store.get("bookmarks",[]),presets:store.get("presets",{}),startup:store.get("startup",""),
-  journal:store.get("journal",[]),
+  journal:store.get("journal",[]),customKeys:store.get("customKeys",[]),
   layers:Object.fromEntries(Object.entries(LAYERS).map(([k,L])=>[k,L.on]))});
   ledger("Vault","","FULL backup exported (keys + bookmarks + presets + layout)","OK","OFFICIAL","");}
 function importFile(cb){const i=document.createElement("input");i.type="file";i.accept=".json,application/json";
@@ -1250,13 +1302,18 @@ function applyImport(j){
     if(j.presets&&typeof j.presets==="object")store.set("presets",j.presets);
     if(typeof j.startup==="string")store.set("startup",j.startup);
     if(Array.isArray(j.journal))store.set("journal",j.journal);
+    if(Array.isArray(j.customKeys))store.set("customKeys",j.customKeys);
     if(j.layers)for(const k in j.layers)if(LAYERS[k])LAYERS[k].on=!!j.layers[k];
     applyLayerVisibility();renderBookmarks();renderPresets();}
   renderLayerList();runAll(true);
   ledger("Vault","","import applied ("+j.type+")","OK","OFFICIAL","validated shape before applying");}
 $("btnSettings").addEventListener("click",()=>{
+  const custom=store.get("customKeys",[]);
   $("modal").innerHTML=`<h3>⚙ Key Vault &amp; Settings — everything stays in YOUR browser</h3>
   ${KEYFIELDS.map(([k,lbl])=>`<label>${lbl}</label><input id="set_${k}" value="${esc(cfg[k]||"")}">`).join("")}
+  <label>Your own keys — add any API key you find, with your label. Stored, exported in backups, ready the moment an adapter uses it. <button class="ibtn" data-info="customkeys">i</button></label>
+  <div id="ckRows">${custom.map((c,i)=>`<div class="row" style="margin:2px 0"><input class="ckL" placeholder="Label (e.g. AirNow)" value="${esc(c.label)}" style="flex:1"><input class="ckV" placeholder="Key value" value="${esc(c.value)}" style="flex:2"></div>`).join("")}</div>
+  <button class="subbtn" id="ckAdd">＋ Add another key</button>
   <label>Home watch zone (ZIP / city / landmark / lat,lon)</label><input id="setHome" value="" placeholder="${esc(cfg.home.name)}">
   <div class="row">
     <button class="hbtn" id="btnExpKeys" title="One file with all keys — move it to any machine">⇩ Export keys</button>
@@ -1269,8 +1326,14 @@ $("btnSettings").addEventListener("click",()=>{
   $("btnExpAll").addEventListener("click",exportBackup);
   $("btnImp").addEventListener("click",()=>importFile(j=>{applyImport(j);$("modalBack").classList.remove("open");}));
   $("setCancel").addEventListener("click",()=>$("modalBack").classList.remove("open"));
+  $("ckAdd").addEventListener("click",()=>{const d=document.createElement("div");d.className="row";d.style.margin="2px 0";
+    d.innerHTML=`<input class="ckL" placeholder="Label" style="flex:1"><input class="ckV" placeholder="Key value" style="flex:2">`;
+    $("ckRows").appendChild(d);});
   $("setSave").addEventListener("click",async()=>{
     KEYFIELDS.forEach(([k])=>{cfg[k]=$("set_"+k).value.trim();store.set(k,cfg[k]);});
+    const Ls=[...document.querySelectorAll("#ckRows .ckL")],Vs=[...document.querySelectorAll("#ckRows .ckV")];
+    const ck=Ls.map((l,i)=>({label:l.value.trim(),value:Vs[i].value.trim()})).filter(c=>c.label&&c.value);
+    store.set("customKeys",ck);
     if(!cfg.nasaKey)cfg.nasaKey="DEMO_KEY",store.set("nasaKey","DEMO_KEY");
     const hq=$("setHome").value.trim();
     if(hq){const loc=await geocode(hq);if(loc){cfg.home=loc;store.set("home",loc);}}
@@ -1283,15 +1346,31 @@ function renderBookmarks(){const b=store.get("bookmarks",[]);
   $("bkList").innerHTML=b.length?b.map((x,i)=>`<div class="bkrow" data-bk="${i}">
     <span class="star2">★</span><span>${esc(x.name)}</span><span class="del" data-bkdel="${i}" title="remove">✕</span></div>`).join("")
     :"None yet — search a place, then press ★";}
-$("btnStar").addEventListener("click",()=>{const b=store.get("bookmarks",[]);
-  if(b.some(x=>x.name===S.loc.name)){return;}
-  b.push({name:S.loc.name,lat:S.loc.lat,lon:S.loc.lon});store.set("bookmarks",b);renderBookmarks();
-  ledger("Bookmarks","","saved: "+S.loc.name,"OK","OFFICIAL","stored locally; in FULL backup export");});
+function saveBookmarkAt(lat,lon,defName){
+  const name=prompt("Name this bookmark:",defName||S.loc.name||(lat.toFixed(4)+", "+lon.toFixed(4)));
+  if(!name)return;
+  const b=store.get("bookmarks",[]);
+  b.push({name:name.trim(),lat,lon,z:+map.getZoom().toFixed(2)});store.set("bookmarks",b);renderBookmarks();
+  ledger("Bookmarks","","saved: "+name+" (zoom "+map.getZoom().toFixed(1)+")","OK","OFFICIAL","stored locally; in FULL backup export");}
+let starDrop=false;
+function setStarDrop(on){starDrop=on;$("btnStar").classList.toggle("on",on);
+  map.getCanvas().style.cursor=on?"crosshair":"";}
+$("btnStar").addEventListener("click",()=>setStarDrop(!starDrop)); // click ★, then click the exact spot
+map.on("click",e=>{if(!starDrop)return;setStarDrop(false);saveBookmarkAt(+e.lngLat.lat.toFixed(5),+e.lngLat.lng.toFixed(5));});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&starDrop)setStarDrop(false);});
+// drag the ★ onto a precise spot (desktop)
+$("btnStar").setAttribute("draggable","true");
+$("btnStar").addEventListener("dragstart",e=>{e.dataTransfer.setData("text/plain","star");});
+map.getCanvas().addEventListener("dragover",e=>e.preventDefault());
+map.getCanvas().addEventListener("drop",e=>{e.preventDefault();
+  const r=map.getCanvas().getBoundingClientRect();
+  const ll=map.unproject([e.clientX-r.left,e.clientY-r.top]);
+  saveBookmarkAt(+ll.lat.toFixed(5),+ll.lng.toFixed(5));});
 document.addEventListener("click",e=>{
   const d=e.target.closest("[data-bkdel]");
   if(d){const b=store.get("bookmarks",[]);b.splice(+d.dataset.bkdel,1);store.set("bookmarks",b);renderBookmarks();e.stopPropagation();return;}
   const r=e.target.closest("[data-bk]");
-  if(r){const b=store.get("bookmarks",[]);const x=b[+r.dataset.bk];if(x){setLocation(x);map.flyTo({center:[x.lon,x.lat],zoom:9});}}});
+  if(r){const b=store.get("bookmarks",[]);const x=b[+r.dataset.bk];if(x){setLocation({...x,z:x.z||9});}}});
 
 /* ============== PRESETS (profiles) + STARTUP ============== */
 function capturePreset(){const c=map.getCenter();return{
@@ -1378,9 +1457,38 @@ setInterval(()=>{if(map.getSource("night"))gj("night");},120000);
 ledger("Sentinel Globe","","v2 started · MapLibre globe · no telemetry","OK","OFFICIAL","3 files, all vendored, auditable");
 renderLayerList();renderTab();watchdogSweep();
 /* ---- Views: globe / polar top-down (azimuthal perspective, honestly derived from the globe) ---- */
-$("btnViewGlobe").addEventListener("click",()=>map.easeTo({center:[cfg.home.lon,35],zoom:2.4,pitch:0,bearing:0,duration:1600}));
-$("btnViewPolar").addEventListener("click",()=>{map.easeTo({center:[cfg.home.lon,89.5],zoom:1.5,pitch:0,bearing:0,duration:1800});
-  ledger("View","","polar top-down — the azimuthal-equidistant perspective, generated live from the globe","OK","OFFICIAL","see ⓘ Views for what this teaches");});
+$("btnViewGlobe").addEventListener("click",()=>{try{map.setProjection({type:"globe"});}catch(e){}
+  map.easeTo({center:[cfg.home.lon,30],zoom:2.2,pitch:0,bearing:0,duration:1600});});
+$("btnViewFlat").addEventListener("click",()=>{try{map.setProjection({type:"mercator"});}catch(e){}
+  map.easeTo({center:[0,20],zoom:1.2,pitch:0,bearing:0,duration:1400});
+  ledger("View","","flat world (Mercator) — turn on ISS to watch its ground track draw the classic wave","OK","OFFICIAL","the wave is a straight orbit drawn on a flattened sphere — the projection makes the wave, not the ISS");});
+$("orbitSpeed").addEventListener("input",e=>{cfg.orbitSpeed=+e.target.value;store.set("orbitSpeed",cfg.orbitSpeed);
+  $("orbitSpeedV").textContent=cfg.orbitSpeed.toFixed(1).replace(".0","")+"×";});
+/* ---- PERF modes: AUTO → LOW → HIGH ---- */
+function applyPerf(){
+  let mode=cfg.perf||"auto";
+  const low=mode==="low"||(mode==="auto"&&((navigator.deviceMemory&&navigator.deviceMemory<=4)||(navigator.hardwareConcurrency&&navigator.hardwareConcurrency<=4)));
+  try{map.setPixelRatio&&map.setPixelRatio(low?1:(window.devicePixelRatio||1));}catch(e){}
+  ["county-labels","satlabels"].forEach(l=>{try{if(map.getLayer(l))map.setLayoutProperty(l,"visibility",low?"none":(l==="county-labels"&&LAYERS.counties.on?"visible":map.getLayoutProperty(l,"visibility")));}catch(e){}});
+  $("btnPerf").textContent=mode.toUpperCase()+(mode==="auto"?(low?" (low)":" (high)"):"");
+  ledger("Performance","",`mode ${mode}${mode==="auto"?(low?" → low":" → high"):""}`,"OK","OFFICIAL","low: render scale 1×, fewer labels; the heaviest layers are Satellites (SGP4 math), Radar loop (tile textures), and Faults (13,696 lines) — toggle those off first on weak devices");}
+$("btnPerf").addEventListener("click",()=>{cfg.perf={auto:"low",low:"high",high:"auto"}[cfg.perf||"auto"];store.set("perf",cfg.perf);applyPerf();});
+map.on("load",applyPerf);
+
+/* ---- Coordinate readout: live hover chip + right-click popup with Bookmark-here ---- */
+const cchip=document.createElement("div");cchip.id="coordChip";document.getElementById("mapWrap").appendChild(cchip);
+let cchipT=0;
+map.on("mousemove",e=>{const t=now();if(t-cchipT<80)return;cchipT=t;
+  cchip.textContent=e.lngLat.lat.toFixed(5)+", "+e.lngLat.lng.toFixed(5);});
+cchip.addEventListener("click",()=>{navigator.clipboard&&navigator.clipboard.writeText(cchip.textContent);
+  cchip.textContent="copied ✓";});
+map.on("contextmenu",e=>{
+  const la=e.lngLat.lat.toFixed(5),lo=e.lngLat.lng.toFixed(5);
+  const p=new maplibregl.Popup().setLngLat(e.lngLat).setHTML(
+    `<b>${la}, ${lo}</b><br><button class="hbtn" id="ccopy" style="margin:4px 4px 0 0">Copy</button><button class="hbtn" id="cbook">★ Bookmark here</button>`).addTo(map);
+  setTimeout(()=>{const c=document.getElementById("ccopy"),b=document.getElementById("cbook");
+    c&&c.addEventListener("click",()=>{navigator.clipboard&&navigator.clipboard.writeText(la+", "+lo);p.remove();});
+    b&&b.addEventListener("click",()=>{p.remove();saveBookmarkAt(+la,+lo);});},50);});
 
 /* ---- Fault click popup ---- */
 map.on("click","fault-lines",e=>{const p=e.features[0].properties;
@@ -1412,6 +1520,43 @@ function openSkyLab(){
   <div class="row"><button class="hbtn" onclick="document.getElementById('modalBack').classList.remove('open')">CLOSE</button></div></div>`;
   $("modalBack").classList.add("open");}
 document.addEventListener("click",e=>{if(e.target.closest("#btnSkyLab"))openSkyLab();});
+
+/* ---- AE Map Lab: the azimuthal-equidistant ("flat earth" / UN emblem) projection,
+   generated LIVE from real coastline data so the distortion is visible, not asserted. ---- */
+let AE_WORLD=null;
+async function openAELab(){
+  $("modal").innerHTML=`<h3>◎ Azimuthal-Equidistant Map Lab <button class="ibtn" data-info="views">i</button></h3>
+  <div class="infobody"><canvas id="aeCanvas" width="640" height="640" style="width:100%;background:#04120c;border-radius:10px"></canvas>
+  <div class="sec">This is Earth's real coastline projected from the North Pole outward — the projection used by the UN emblem and by Flat-Earth maps. Distances from the pole are true; everything else distorts, growing extreme toward the south: <b>watch Antarctica smear into a ring around the edge.</b> The cyan dot is the ISS, live. Same planet, same data as the globe — only the mathematics of flattening changed.</div>
+  <div class="sec finer">Great teaching question for the kids: if this map were literally true, Antarctica would be an ice wall longer than Earth's equator, and a flight from Australia to Chile would be impossibly long — yet airlines fly it daily in ~14 hours. The projection is useful; taking it literally isn't.</div>
+  <div class="row"><button class="hbtn" onclick="document.getElementById('modalBack').classList.remove('open')">CLOSE</button></div></div>`;
+  $("modalBack").classList.add("open");
+  try{
+    if(!AE_WORLD){const r=await fetch("world.geojson");if(!r.ok)throw new Error("world.geojson missing from repo");AE_WORLD=await r.json();
+      ledger("AE Lab","","coastlines loaded (Natural Earth, public domain, vendored)","OK","OFFICIAL","");}
+    drawAE();const iv=setInterval(()=>{if(!document.getElementById("aeCanvas")){clearInterval(iv);return;}drawAE();},5000);
+  }catch(e){ledger("AE Lab","",e.message,"FAIL","UNAVAILABLE","upload world.geojson to the repo");}}
+function aeXY(lat,lon,cx,cy,R){const r=(90-lat)/180*R,t=lon*Math.PI/180;return[cx+r*Math.sin(t),cy-r*Math.cos(t)];}
+function drawAE(){
+  const cv=document.getElementById("aeCanvas");if(!cv)return;const g=cv.getContext("2d");
+  const cx=320,cy=320,R=300;g.clearRect(0,0,640,640);
+  g.strokeStyle="#1d3a2f";g.lineWidth=1;
+  for(let la=60;la>=-90;la-=30){g.beginPath();g.arc(cx,cy,(90-la)/180*R,0,7);g.stroke();} // latitude rings
+  for(let lo=0;lo<360;lo+=30){const[a,b]=aeXY(-90,lo,cx,cy,R);g.beginPath();g.moveTo(cx,cy);g.lineTo(a,b);g.stroke();}
+  g.strokeStyle="#5fbf9f";g.lineWidth=1.1;
+  const draw=cs=>{g.beginPath();cs.forEach((p,i)=>{const[x,y]=aeXY(p[1],p[0],cx,cy,R);i?g.lineTo(x,y):g.moveTo(x,y);});g.stroke();};
+  if(AE_WORLD)for(const f of AE_WORLD.features){const G=f.geometry;
+    if(G.type==="Polygon")G.coordinates.forEach(draw);
+    else if(G.type==="MultiPolygon")G.coordinates.forEach(p=>p.forEach(draw));
+    else if(G.type==="LineString")draw(G.coordinates);
+    else if(G.type==="MultiLineString")G.coordinates.forEach(draw);}
+  // home + live ISS
+  const[hx,hy]=aeXY(cfg.home.lat,cfg.home.lon,cx,cy,R);
+  g.fillStyle="#e0b24b";g.beginPath();g.arc(hx,hy,4,0,7);g.fill();g.fillText("home",hx+6,hy);
+  if(S.iss){const[ix,iy]=aeXY(S.iss.lat,S.iss.lon,cx,cy,R);
+    g.fillStyle="#7fd4ff";g.beginPath();g.arc(ix,iy,5,0,7);g.fill();g.fillStyle="#7fd4ff";g.fillText("ISS (live)",ix+7,iy);}
+  g.fillStyle="#6b8078";g.font="10px sans-serif";g.fillText("Azimuthal equidistant, north polar aspect — Natural Earth coastlines",10,630);}
+document.addEventListener("click",e=>{if(e.target.closest("#btnAELab"))openAELab();});
 
 /* ---- boot: bookmarks, presets, startup profile ---- */
 renderBookmarks();renderPresets();
