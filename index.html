@@ -56,6 +56,9 @@ h2:first-child{margin-top:0}
 #coordChip{position:absolute;left:8px;bottom:6px;z-index:26;font-size:10.5px;color:#9fb8ae;
   background:#04120ccc;border:1px solid #163026;border-radius:8px;padding:2px 8px;cursor:pointer;user-select:none}
 #coordChip:hover{color:#7fe0bd}
+.anom.canfly{cursor:pointer}
+.anom.canfly:hover,tr[data-bafly]:hover,tr[data-fly]:hover{outline:1px solid #3a6a58;background:#0e2018}
+.anom.canfly:active,tr[data-bafly]:active{background:#16402f}
 #map{position:absolute;inset:0}
 #mockBanner{display:none;position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:40;
   background:var(--mock);color:#1a0a24;font-weight:800;font-size:12px;letter-spacing:1px;
@@ -152,17 +155,46 @@ body.focus #feedBar{display:none}
 .prerow .del{margin-left:auto;cursor:pointer;color:#7a5a5a}
 .prerow .boot{cursor:pointer}.prerow .boot.on{color:#e0b24b}
 #bmRow .hbtn{flex:1;padding:5px 4px;font-size:10px}
-@media (max-width:980px){
-  #app{grid-template-columns:1fr;grid-template-rows:52px 26px 46vh 1fr 200px;
-    grid-template-areas:"hdr" "feeds" "map" "right" "bottom"}
-  #left{display:none}
+/* ---------- PHONE MODE: single column, full-width globe, bottom nav, slide-up sheets ---------- */
+@media (max-width:900px){
+  html,body{overflow-x:hidden}
+  #app{grid-template-columns:1fr;grid-template-rows:46px 24px 1fr;
+    grid-template-areas:"hdr" "feeds" "map"}
+  body.focus #app{grid-template-rows:46px 0 1fr}
+  header{overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap;gap:6px;padding:0 8px;
+    scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  header::-webkit-scrollbar{display:none}
+  header .hbtn{flex:none;padding:5px 8px;font-size:10.5px}
+  header h1{font-size:13px;flex:none}
+  #searchInput{min-width:110px;width:110px;flex:none}
+  #feedBar{overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}
+  #feedBar::-webkit-scrollbar{display:none}
+  .fchip{flex:none}
+  /* panels become slide-up sheets above the nav */
+  #left,#right,#bottom{display:none;position:fixed;left:0;right:0;bottom:46px;top:auto;
+    max-height:68vh;overflow-y:auto;z-index:60;background:#0b1712f2;
+    border-top:1px solid var(--line);border-left:none;border-right:none;
+    box-shadow:0 -12px 30px #000a;padding:12px 12px 20px;backdrop-filter:blur(6px)}
+  body.m-left #left{display:block}
+  body.m-right #right{display:block}
+  body.m-bottom #bottom{display:flex}
+  #bottom .tabs{flex-wrap:wrap}
+  #mobileNav{display:flex}
+  #coordChip{bottom:52px}
+  .maplibregl-ctrl-top-right{top:4px}
 }
+#mobileNav{display:none;position:fixed;left:0;right:0;bottom:0;height:46px;z-index:65;
+  background:linear-gradient(180deg,#0e1d17,#0a1410);border-top:1px solid var(--line);
+  align-items:stretch;justify-content:space-around}
+#mobileNav button{flex:1;background:none;border:none;color:#9fb8ae;font:11px inherit;cursor:pointer}
+#mobileNav button.on{color:var(--vir3,#7fe0bd);background:#12261e}
+body.focus #mobileNav{display:none!important}
 </style>
 </head>
 <body>
 <div id="app">
 <header>
-  <div class="brand"><h1>SENTINEL GLOBE</h1><span class="tag">v2 · PUBLIC TELEMETRY</span></div>
+  <div class="brand"><h1>SENTINEL GLOBE</h1><span class="tag" id="verTag">PUBLIC TELEMETRY</span></div>
   <div id="searchWrap">
     <input id="searchInput" placeholder="ZIP, city, or lat,lon — e.g. 76234 or Decatur TX">
     <button class="hbtn" id="btnGo">GO</button>
@@ -181,6 +213,12 @@ body.focus #feedBar{display:none}
 </header>
 
 <div id="feedBar" title="Live status of every data feed — click any chip"></div>
+<nav id="mobileNav">
+  <button data-mnav="m-left">☰ Layers</button>
+  <button data-mnav="m-right">📍 Brief</button>
+  <button data-mnav="m-bottom">▦ Data</button>
+  <button data-mnav="">🌐 Map</button>
+</nav>
 
 <div class="panel" id="left">
   <h2>Basemap <button class="ibtn" data-info="basemap">i</button></h2>
@@ -191,7 +229,8 @@ body.focus #feedBar{display:none}
   <h2>Views <button class="ibtn" data-info="polar">i</button></h2>
   <div id="bmRow">
     <button class="hbtn" id="btnViewGlobe">🌐 Globe</button><button class="hbtn" id="btnViewFlat">🗺 Flat world</button>
-    <button class="hbtn" id="btnAELab">◎ AE Map Lab</button>
+    <button class="hbtn" id="btnAELab">◎ Flat Map (Polar)</button>
+    <button class="hbtn" id="btnFollowISS" title="camera locks onto the ISS as it orbits">🛰 Follow ISS <button class="ibtn" data-info="follow">i</button></button>
   </div>
   <div class="finer" style="margin:2px 0">Orbit speed <input type="range" id="orbitSpeed" min="0.2" max="8" step="0.2" value="1" style="width:60%;vertical-align:middle"> <span id="orbitSpeedV">1×</span></div>
   <div class="finer">Performance <button class="hbtn" id="btnPerf" style="padding:2px 8px;font-size:10px">AUTO</button> <button class="ibtn" data-info="perf">i</button>
@@ -224,7 +263,12 @@ body.focus #feedBar{display:none}
 <div id="mapWrap">
   <div id="map"></div>
   <div id="mockBanner">⚠ MOCK MODE — SAMPLE DATA IS DISPLAYED AND LABELED MOCK</div>
-  <div id="radarBar"><span>NEXRAD</span><button class="hbtn" id="btnRadarPause">⏸</button><span id="radarTime">latest</span></div>
+  <div id="radarBar"><span>NEXRAD</span><button class="hbtn" id="btnRadarPause">⏸</button>
+    <select id="radarSpan" title="loop length — beyond 50 min uses the IEM archive (experimental)">
+      <option value="50">50 min · live</option><option value="180">3 h · archive</option>
+      <option value="720">12 h · archive</option><option value="1440">24 h · archive</option>
+      <option value="4320">72 h · archive</option></select>
+    <span id="radarTime">latest</span><span id="radarLbl"></span></div>
   <div id="mapAttrib">© <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors · Radar: NOAA/IEM · MapLibre</div>
 </div>
 
@@ -242,6 +286,7 @@ body.focus #feedBar{display:none}
     <div class="tab" data-tab="ledger">TRUTH LEDGER <button class="ibtn" data-info="ledger">i</button></div>
     <div class="tab" data-tab="watchdog">WATCHDOG <button class="ibtn" data-info="watchdog">i</button></div>
     <div class="tab" data-tab="sources">SOURCES <button class="ibtn" data-info="sources">i</button></div>
+    <div class="tab" data-tab="anomalies">ANOMALIES <button class="ibtn" data-info="anom">i</button></div>
     <div class="tab" data-tab="registry">REGISTRY <button class="ibtn" data-info="registry">i</button></div>
     <div class="tab" data-tab="journal">JOURNAL <button class="ibtn" data-info="journal">i</button></div>
   </div>
@@ -313,7 +358,7 @@ const INFO={
 layers:{t:"Layers",w:"Each toggle draws one public data stream on the map. Colored dot = its map color. Badge = confidence class. Right number = data age.",s:"—",f:"—",c:"—",l:"Confidence vocabulary: MEASURED (instrument), OFFICIAL (government alert product), MODELED (computed), MOCK (sample, always labeled), EXPERIMENTAL."},
 quakes:{t:"Earthquakes",w:"Every earthquake USGS has published for the selected window. Circle size = magnitude, color = how recent (bright = newer). Click any circle for details.",s:"USGS earthquake.usgs.gov GeoJSON feed",f:"Feed updates ~1 min; small quakes can take minutes–hours to appear",c:"MEASURED",l:"Magnitudes are revised after analyst review; early values shift."},
 alerts:{t:"US Weather Alerts",w:"Active National Weather Service warnings/watches/advisories. Polygons drawn where NWS provides geometry; all point alerts for your location appear in the ALERTS tab and Local Brief.",s:"NWS api.weather.gov (official)",f:"Refreshed every 3 min",c:"OFFICIAL",l:"US only. Some alerts have no polygon (county-based) so they list but don't draw."},
-radar:{t:"Live Radar (NEXRAD)",w:"Composite US weather radar (reflectivity). The loop plays the last 50 minutes in 5-minute frames so you can see storm motion. This IS the live national feed — NEXRAD radars physically complete a volume scan every 4–6 minutes; no public source is faster.",s:"NOAA NEXRAD via Iowa Environmental Mesonet tile cache",f:"New frame every ~5 min",c:"MEASURED",l:"US coverage only. Reflectivity ≠ rain at ground (virga, birds, ground clutter possible)."},
+radar:{t:"Live Radar (NEXRAD)",w:"Composite US weather radar (reflectivity). The loop plays the last 50 minutes in 5-minute frames so you can see storm motion. This IS the live national feed — NEXRAD radars physically complete a volume scan every 4–6 minutes; no public source is faster.",s:"NOAA NEXRAD via Iowa Environmental Mesonet tile cache",f:"New frame every ~5 min",c:"MEASURED",l:"US coverage only. Reflectivity ≠ rain at ground (virga, birds, ground clutter possible). Spans beyond 50 min switch to IEM's timestamped ARCHIVE composites (years deep, 5-min steps) — EXPERIMENTAL: a blank frame is an archive gap, not clear skies; the frame label always shows how far back you are looking."},
 fires:{t:"Active Fires",w:"Satellite thermal-anomaly detections. Click a dot for detection time, satellite, and FIRMS confidence.",s:"NASA FIRMS (VIIRS), free key in ⚙",f:"Satellites revisit every 3–6 h; refreshed 15 min",c:"MEASURED",l:"A detection is a heat anomaly, not a confirmed fire (gas flares, industry trigger it). Clouds hide fires."},
 iss:{t:"ISS Live Position",w:"The International Space Station right now, with its recent ground trail. It orbits every ~92 min at ~7.66 km/s.",s:"WhereTheISS.at (TLE propagation)",f:"Every 65 s",c:"MEASURED",l:"~km-scale accuracy. Pass predictions for your yard: Phase 2 (needs SGP4)."},
 aircraft:{t:"Aircraft (ADS-B)",w:"Aircraft broadcasting ADS-B near the map center. Click for callsign, altitude, speed, heading.",s:"OpenSky Network, anonymous tier",f:"On refresh, ~60 s",c:"MEASURED",l:"HONEST LIMIT: OpenSky heavily restricts anonymous access (a few hundred requests/day, sometimes blocked entirely). If the Watchdog shows this yellow/red, that is OpenSky refusing anonymous traffic — not a bug here. Reliable feed needs their free OAuth account + a tiny proxy (Phase 3). Coverage depends on volunteer receivers; military/some GA aircraft don't broadcast."},
@@ -331,13 +376,15 @@ ledger:{t:"Truth Ledger",w:"An append-only log of every fetch this session: sour
 sources:{t:"Sources & Integrity",w:"The registry of every data source with its terms posture, refresh rate, and honest limitations, plus this app's standing integrity rules.",s:"Internal",f:"—",c:"—",l:"—"},
 notif:{t:"Notifications",w:"When ON, your browser notifies you even in another tab for: new official NWS alerts at your home location, quakes M4.5+ within ~300 mi of home, Kp reaching 6+ (strong geomagnetic storm), or a fire detection within ~50 mi of home. Each event notifies once (deduplicated).",s:"Rules run locally on the same public feeds",f:"Evaluated every refresh cycle",c:"mixed, per underlying source",l:"Only works while the tab is open (a PWA/service-worker version is Phase 3). Browser must grant permission. This is convenience, not a life-safety system — a NOAA weather radio does not depend on your browser."},
 modes:{t:"Header Modes",w:"AMBIENT = slow, beautiful globe auto-rotation for leaving on a wall screen; touching the map pauses it. INTEGRITY = hides anything mock, experimental, or low-confidence — only verified live data remains. MOCK = clearly-banner-labeled sample data for testing the interface. 🔔 = browser notifications for your home watch zone. ◱ FOCUS = hides every panel so the map alone fills the window. ⛶ = true fullscreen (press Esc to exit). Stack all three — Fullscreen + Focus + Ambient — for a wall display.",s:"—",f:"—",c:"—",l:"MOCK and live can never mix silently: the Watchdog flags RED if mock items appear outside Mock mode."},
-views:{t:"Views: Globe, Flat World, AE Lab",w:"Globe = the true 3D sphere (drag with right-click/two fingers to pitch it). Flat World switches the SAME data to a Mercator flat map — turn on the ISS layer and its dashed ground track draws the famous NASA wave. The wave is a perfectly regular orbit drawn on a flattened sphere: the projection makes the wave, not the spacecraft. ◎ AE Map Lab opens the azimuthal-equidistant map — the projection the UN emblem and Flat-Earth maps use — drawn live from real coastline data with the real ISS position, so you can see exactly how flattening a sphere from the pole stretches the south.",s:"Same data, three honest projections",f:"—",c:"—",l:"Every flat map of Earth distorts something; that is a mathematical theorem (Gauss), not an opinion. The AE Lab shows Antarctica smeared into a ring — the projection doing it in front of you."},
+views:{t:"Views: Globe, Flat World, Flat Polar",w:"Three ways to see the same live data. Globe: the 3D sphere — drag with right-click or two fingers to pitch and orbit it. Flat World: a rectangular world map; with the ISS layer on, its ground track draws the wave pattern seen on NASA mission-control walls. Flat Map (Polar): North Pole at center, Antarctica along the rim — the layout of the UN emblem and the Flat Earth Society map — fully interactive: scroll to zoom, drag to spin, hover for coordinates, with quakes, fires, grid regions, and the live ISS drawn on it.",s:"Identical data across all three views",f:"—",c:"—",l:"The 3D engine natively renders the Globe and Flat World views; the Polar view uses its own dedicated renderer, which is why it opens as its own panel."},
 perf:{t:"Performance Modes",w:"AUTO senses your device (memory/cores) and picks; LOW renders at 1× scale and drops the densest labels for phones and weak laptops; HIGH is full quality. The genuinely heavy layers, in order: Satellites (SGP4 math for hundreds of objects), Radar Loop (12 tile textures), Fault Lines (13,696 lines), Starlink group. Toggle those off first if anything stutters.",s:"—",f:"—",c:"—",l:"AUTO's device sensing is approximate — browsers deliberately fuzz hardware info."},
 customkeys:{t:"Your Own Keys",w:"A place to store ANY API key you find, with your own label. Saved locally, included in key export and FULL backup. When a future adapter needs that provider, the key is already waiting — no rebuild needed.",s:"You",f:"—",c:"—",l:"Storing a key does not create an adapter — data starts flowing when an adapter for that provider exists. Ask and it gets built into the next version."},
 coords:{t:"Coordinates Readout",w:"The chip at the bottom-left shows the latitude, longitude under your cursor live; click the chip to copy. Right-click anywhere on the map for a popup with the exact coordinates, a Copy button, and ★ Bookmark here.",s:"Computed from the map view",f:"Live",c:"—",l:"Displayed to 5 decimals ≈ 1 meter of precision — far finer than most of the data layers themselves."},
 registry:{t:"Source Registry",w:"Every lawful source this app knows about — grid and earth-field — with a trust tier (1 official operational … 7 user journal) and an honest adapter status. LIVE flows into the app now; KEYED needs your free key; STUB is a reserved adapter slot; LINK means no lawful browser API exists and one click opens the official source. Labeling something LINK instead of faking a feed is the integrity rule working, not a shortcut.",s:"Compiled from your expansion specification; each row links its source",f:"Static registry, updated with app versions",c:"—",l:"A trust tier rates the SOURCE class, not any individual reading. Tier-5 mirrors (e.g. Schumann dashboards) can be right — but you cannot verify it from the mirror alone, which is exactly why they are tier 5."},
 journal:{t:"User Journal (Tier 7)",w:"Your own observations — sleep, mood, headaches, weather feel, prayer times, family notes. Stored locally, included in FULL backup, and kept strictly separate from measured data so subjective notes can never contaminate telemetry.",s:"You",f:"Whenever you write",c:"TIER 7 — subjective",l:"Any pattern you notice between journal entries and earth-field data is exploratory correlation with a sample size of one household. It is not proof, not diagnosis, and not medical guidance — and this app will never present it as such."},
 imf:{t:"IMF Bz / Bt",w:"The interplanetary magnetic field carried by the solar wind, measured at the DSCOVR spacecraft. Bt = total strength; Bz = the north-south component. When Bz points SOUTH (negative) for hours, it links up with Earth's field and lets solar-wind energy pour in — that is the main switch for geomagnetic storms. Northward Bz mostly deflects the flow.",s:"NOAA SWPC / DSCOVR at L1",f:"~1-min data, fetched every 5 min",c:"MEASURED",l:"L1 is 15–60 min upstream of Earth depending on wind speed. A single negative spike means little; duration is what matters."},
+anom:{t:"Anomalies & SITREP",w:"Every pattern the engine flags across ALL feeds, led by a one-paragraph SITREP: posture (QUIET / ADVISORY / WATCH / ELEVATED), finding count, and the leading items. Cards marked ◎ are clickable — the map flies there and pulses the spot. Cross-layer rules now include: systemic multi-region grid stress, geomagnetic activity coinciding with grid stress, flare-then-storm sequences, and feeds going dark during an active severe event.",s:"Rule engine over every live feed + your recorded baseline",f:"Every refresh cycle",c:"Per finding — printed on each card",l:"Findings are pattern detections with stated uncertainty, never predictions. The briefing discipline is the point: source, confidence, and what would raise it, before any reaction."},
+follow:{t:"Follow ISS",w:"Locks the camera onto the International Space Station as it orbits at ~27,600 km/h — one lap of Earth every ~92 minutes. Between the live fixes (about once a minute) the position is propagated with SGP4 so the ride is smooth, and its dashed ground track shows where it is headed. Drag the map and the follow releases instantly — your hand always beats the autopilot. Turning this on turns ORBIT rotation off, since both want the camera.",s:"WhereTheISS fixes + CelesTrak orbit, SGP4-propagated",f:"Camera updates every 2 s",c:"MODELED position from MEASURED orbit — km-scale accuracy",l:"Best experienced on the Globe view zoomed to 3–4. On the Flat World view the camera will jump at the date line — that is the flattening, not the station."},
 feeds:{t:"Feed Status Bar",w:"Live state of every data source. Spinning ring = fetching now. Green dot + age = loaded, showing how old the data is. Red ✕ = last attempt failed. Gray — = off (layer disabled or key missing). Click any chip for details: the exact error, how often it polls, a ↻ Retry button, a link to view the SAME data at the official source website, and honest alternatives for feeds that fail often.",s:"Internal instrumentation of every adapter",f:"Updates the instant any fetch starts or finishes",c:"—",l:"Shows fetch health only — it cannot detect a source returning wrong-but-well-formed data (the Watchdog cross-checks handle that)."},
 faults:{t:"Fault Lines (global)",w:"13,696 mapped active faults worldwide, drawn in red. Click any fault for its name and slip type. A fault on the map means geologists have documented movement there in the geologically recent past — it is NOT a prediction that it will move soon.",s:"GEM Global Active Faults Database (research compilation, CC-BY-SA), vendored in this repo",f:"Static research dataset",c:"MEASURED",l:"Compiled from regional catalogs of varying quality; some regions are mapped in far more detail than others. Simplified to ~1 km precision for speed. Absence of a drawn fault does not mean absence of a fault."},
 flow:{t:"Power Flow Between BAs",w:"Animated lines showing electricity interchange between balancing authorities — which regions are exporting power (line flows away) and which are importing. Line thickness = megawatts. Moving dashes show direction. This is how you SEE the relationships between grid operators: ERCOT is nearly an island; the Eastern and Western interconnections trade constantly.",s:"EIA-930 interchange data (needs your free EIA key)",f:"Hourly, 1–2 h publication lag",c:"MEASURED values, MODELED line positions (region centroids)",l:"The animation represents direction, not literal electron speed. Flows under 25 MW are hidden as noise. Intra-BA flows are not public."},
@@ -426,7 +473,8 @@ async function geocode(q){
    MAP — MapLibre GL v5 (vendored), globe projection, OSM raster basemap
    Real zoom: world → street level in Decatur.
    ===================================================================== */
-const RADAR_FRAMES=["-m50m","-m45m","-m40m","-m35m","-m30m","-m25m","-m20m","-m15m","-m10m","-m05m",""]; // "" = latest
+const RADAR_FRAMES=["-m50m","-m45m","-m40m","-m35m","-m30m","-m25m","-m20m","-m15m","-m10m","-m05m",""]; // "" = latest (LIVE set)
+let radarSpanMin=50, radarArchive=[]; // archive mode holds [{ts,label}] for IEM timestamped composites
 const style={
   version:8, projection:{type:"globe"},
   sky:{"sky-color":"#0a1a14","horizon-color":"#173a2e","fog-color":"#0a1210",
@@ -518,48 +566,64 @@ const SRC={ // each returns fresh GeoJSON from state
     geometry:{type:"LineString",coordinates:[[f.a.lon,f.a.lat],[f.b.lon,f.b.lat]]},
     properties:{mw:f.mw,from:f.from,to:f.to}}))}),
 };
+function buildIcons(){
+  const mk=(name,draw,px=64)=>{try{const c=document.createElement("canvas");c.width=c.height=px;
+    const g=c.getContext&&c.getContext("2d");if(!g)return;
+    draw(g,px);map.addImage(name,g.getImageData(0,0,px,px),{pixelRatio:2});}catch(e){}};
+  const emoji=(name,ch,size=46)=>mk(name,(g,px)=>{g.font=size+"px serif";g.textAlign="center";g.textBaseline="middle";
+    g.fillText(ch,px/2,px/2+3);});
+  emoji("i-fire","🔥");emoji("i-plane","✈️");emoji("i-ship","🚢");emoji("i-sat","🛰️",38);
+  emoji("i-iss","🛰️",52);emoji("i-plant","⚡",40);emoji("i-sub","🔌",34);emoji("i-ba","⚡",34);
+  mk("i-quake",(g,px)=>{const c=px/2;g.strokeStyle="#ff5a6e";g.lineWidth=5;
+    g.beginPath();g.arc(c,c,10,0,7);g.stroke();g.globalAlpha=0.7;
+    g.beginPath();g.arc(c,c,19,0,7);g.stroke();g.globalAlpha=0.4;
+    g.beginPath();g.arc(c,c,27,0,7);g.stroke();g.globalAlpha=1;
+    g.fillStyle="#ff5a6e";g.beginPath();g.arc(c,c,4,0,7);g.fill();});}
 map.on("load",()=>{
+  buildIcons();
   for(const id in SRC)map.addSource(id,{type:"geojson",data:SRC[id]()});
   map.addLayer({id:"night",type:"fill",source:"night",paint:{"fill-color":"#000","fill-opacity":0.28}});
   map.addLayer({id:"flow",type:"line",source:"flow",layout:{visibility:"none","line-cap":"round"},
     paint:{"line-color":["case",["<",["get","mw"],0],"#e0b24b","#7fe0bd"],
       "line-width":["interpolate",["linear"],["abs",["get","mw"]],25,1,2000,3.5,8000,7],
       "line-opacity":0.8,"line-dasharray":["literal",[0,2,3]]}});
+  map.addSource("hl",{type:"geojson",data:{type:"FeatureCollection",features:[]}});
+  map.addLayer({id:"hl",type:"circle",source:"hl",paint:{
+    "circle-color":"#ff7ac2","circle-opacity":0.25,"circle-radius":18,
+    "circle-stroke-color":"#ff7ac2","circle-stroke-width":2.5,"circle-stroke-opacity":0.9}});
   map.addLayer({id:"isstrack",type:"line",source:"isstrack",
     paint:{"line-color":"#7fd4ff","line-opacity":0.55,"line-width":1.6,"line-dasharray":[2,2]}});
-  map.addLayer({id:"ships",type:"circle",source:"ships",layout:{visibility:"none"},
-    paint:{"circle-color":"#5bb8d9","circle-radius":["interpolate",["linear"],["zoom"],3,2,10,5],
-      "circle-stroke-color":"#04120c","circle-stroke-width":1}});
-  map.addLayer({id:"sats",type:"circle",source:"sats",layout:{visibility:"none"},
-    paint:{"circle-color":["match",["get","grp"],"stations","#7fd4ff","weather","#7fe0bd","starlink","#c9b8ff","#d98a5b"],
-      "circle-radius":2.6,"circle-opacity":0.9}});
+  map.addLayer({id:"ships",type:"symbol",source:"ships",
+    layout:{visibility:"none","icon-image":"i-ship","icon-size":0.5,"icon-allow-overlap":true,
+      "icon-rotate":["coalesce",["get","cog"],0],"icon-rotation-alignment":"map"}});
+  map.addLayer({id:"sats",type:"symbol",source:"sats",
+    layout:{visibility:"none","icon-image":"i-sat","icon-size":0.42,"icon-allow-overlap":true}});
   map.addLayer({id:"alertpolys",type:"fill",source:"alertpolys",paint:{"fill-color":
     ["match",["get","sev"],"Extreme","#d9455b","Severe","#d96a5b","Moderate","#e0b24b","#8fa69e"],"fill-opacity":0.22}});
   map.addLayer({id:"alertlines",type:"line",source:"alertpolys",paint:{"line-color":"#d96a5b","line-width":1.3,"line-opacity":0.8}});
   map.addLayer({id:"power-lines",type:"line",source:"power",filter:["==",["get","kind"],"line"],
     paint:{"line-color":"#9fb6ad","line-width":["interpolate",["linear"],["zoom"],6,0.6,12,2],"line-opacity":0.75}});
-  map.addLayer({id:"power-subs",type:"circle",source:"power",filter:["==",["get","kind"],"substation"],
-    paint:{"circle-color":"#5fbf9f","circle-radius":["interpolate",["linear"],["zoom"],6,2.5,13,7],"circle-stroke-color":"#04120c","circle-stroke-width":1}});
-  map.addLayer({id:"power-plants",type:"circle",source:"power",filter:["==",["get","kind"],"plant"],
-    paint:{"circle-color":"#7fe0bd","circle-radius":["interpolate",["linear"],["zoom"],5,4,13,11],"circle-stroke-color":"#04120c","circle-stroke-width":1.5}});
-  map.addLayer({id:"ba",type:"circle",source:"ba",paint:{
-    "circle-radius":["interpolate",["linear"],["coalesce",["get","d"],0],0,4,20000,10,80000,20],
-    "circle-color":["case",["!",["has","stress"]],"#4a5a53",
-      ["<",["get","stress"],0.99],"#4ecb8d",["<",["get","stress"],1.04],"#e0b24b","#d9455b"],
-    "circle-opacity":0.82,"circle-stroke-color":"#04120c","circle-stroke-width":1.2}});
-  map.addLayer({id:"quakes",type:"circle",source:"quakes",paint:{
-    "circle-radius":["interpolate",["linear"],["get","mag"],1,2.4,4,7,7,20],
-    "circle-color":["case",["get","mock"],"#c08be8",
-      ["<",["get","ageH"],1],"#ffd97a",["<",["get","ageH"],24],"#e0b24b","#9a7f47"],
-    "circle-opacity":0.85,"circle-stroke-color":"#04120c","circle-stroke-width":1}});
-  map.addLayer({id:"fires",type:"circle",source:"fires",paint:{
-    "circle-radius":["interpolate",["linear"],["zoom"],2,2.2,9,6],
-    "circle-color":["case",["get","mock"],"#c08be8","#ff7a3c"],"circle-opacity":0.9}});
-  map.addLayer({id:"aircraft",type:"circle",source:"aircraft",paint:{
-    "circle-radius":4,"circle-color":"#b8c7ff","circle-stroke-color":"#04120c","circle-stroke-width":1}});
+  map.addLayer({id:"power-subs",type:"symbol",source:"power",filter:["==",["get","kind"],"substation"],
+    layout:{"icon-image":"i-sub","icon-size":0.55,"icon-allow-overlap":true,visibility:"none"}});
+  map.addLayer({id:"power-plants",type:"symbol",source:"power",filter:["==",["get","kind"],"plant"],
+    layout:{"icon-image":"i-plant","icon-size":0.75,"icon-allow-overlap":true,visibility:"none"}});
+  map.addLayer({id:"ba-halo",type:"circle",source:"ba",paint:{ // stress color stays readable under the icon
+    "circle-radius":["interpolate",["linear"],["coalesce",["get","d"],0],2000,9,30000,15,80000,21],
+    "circle-color":["case",[">",["coalesce",["get","stress"],1],1.04],"#d9455b",[">",["coalesce",["get","stress"],1],0.99],"#e0b24b","#2f7a5f"],
+    "circle-opacity":0.55,"circle-stroke-color":"#04120c","circle-stroke-width":1}});
+  map.addLayer({id:"ba",type:"symbol",source:"ba",
+    layout:{"icon-image":"i-ba","icon-size":["interpolate",["linear"],["coalesce",["get","d"],0],2000,0.5,80000,0.95],"icon-allow-overlap":true}});
+  map.addLayer({id:"quakes",type:"symbol",source:"quakes",
+    layout:{"icon-image":"i-quake","icon-allow-overlap":true,
+      "icon-size":["interpolate",["linear"],["coalesce",["get","mag"],3],2,0.35,4.5,0.65,6,0.95,7.5,1.3]}});
+  map.addLayer({id:"fires",type:"symbol",source:"fires",
+    layout:{"icon-image":"i-fire","icon-size":0.5,"icon-allow-overlap":true}});
+  map.addLayer({id:"aircraft",type:"symbol",source:"aircraft",
+    layout:{"icon-image":"i-plane","icon-size":0.5,"icon-allow-overlap":true,
+      "icon-rotate":["-",["coalesce",["get","hdg"],0],45],"icon-rotation-alignment":"map"}});
   map.addLayer({id:"isstrail",type:"line",source:"isstrail",paint:{"line-color":"#7fd4ff","line-width":1.4,"line-dasharray":[2,2],"line-opacity":0.7}});
-  map.addLayer({id:"iss",type:"circle",source:"iss",paint:{"circle-radius":7,"circle-color":"#7fd4ff",
-    "circle-stroke-color":"#fff","circle-stroke-width":2}});
+  map.addLayer({id:"iss",type:"symbol",source:"iss",
+    layout:{"icon-image":"i-iss","icon-size":0.9,"icon-allow-overlap":true}});
   applyLayerVisibility();
   // click popups with honest per-feature detail
   const pop=(html,ll)=>new maplibregl.Popup({closeButton:true,maxWidth:"320px"}).setLngLat(ll).setHTML(html).addTo(map);
@@ -570,6 +634,7 @@ map.on("load",()=>{
   map.on("click","aircraft",e=>{const p=e.features[0].properties;
     pop(`<b>${esc(p.cs||p.icao)}</b><br>alt ${p.alt?Math.round(p.alt)+" m":"—"} · ${p.vel?Math.round(p.vel*1.944)+" kt":"—"} · hdg ${p.hdg?Math.round(p.hdg)+"°":"—"}<br><span style="color:#8fa69e">OpenSky ADS-B · MEASURED</span>`,e.lngLat);});
   map.on("click","ba",e=>{const p=e.features[0].properties;
+    pulseAt(e.features[0].geometry.coordinates[0],e.features[0].geometry.coordinates[1],p.code);
     pop(`<b>${esc(p.code)}</b> ${esc(p.name)}<br>Demand ${p.d?(+p.d).toLocaleString()+" MWh":"—"}<br>Forecast ${p.df?(+p.df).toLocaleString()+" MWh":"—"}<br>D/F ratio ${p.stress?(+p.stress).toFixed(3):"—"} · hour ${esc(p.period||"")}<br><span style="color:#8fa69e">EIA-930 · hourly, ~1–2 h lag · not real-time SCADA</span>`,e.lngLat);});
   map.on("click","power-plants",e=>{const p=e.features[0].properties;
     pop(`<b>⚡ ${esc(p.name||"Power plant")}</b><br>${p.out?"Output: "+esc(p.out)+"<br>":""}${p.srcTag?"Source: "+esc(p.srcTag)+"<br>":""}${p.op?"Operator: "+esc(p.op)+"<br>":""}<span style="color:#8fa69e">OpenStreetMap (ODbL) · crowd-mapped</span>`,e.lngLat);});
@@ -587,19 +652,49 @@ map.on("error",e=>{const m=e&&e.error&&e.error.message||"map error";
 
 /* ---------- radar loop ---------- */
 let radarPlaying=false, radarFrame=RADAR_FRAMES.length-1, radarTimer=null;
-function radarShow(i){
+const radarCount=()=>radarSpanMin>50?radarArchive.length:RADAR_FRAMES.length;
+function radarShowLive(i){
   RADAR_FRAMES.forEach((_,j)=>{if(!map.getLayer("radar"+j))return;
     map.setLayoutProperty("radar"+j,"visibility",j===i?"visible":"none");
     map.setPaintProperty("radar"+j,"raster-opacity",j===i?0.72:0);});
   const back=(RADAR_FRAMES.length-1-i)*5;
   $("radarTime").textContent=back===0?"latest":`now − ${back} min`;}
+/* Archive radar: IEM keeps timestamped US composites (ridge::USCOMP-N0Q-YYYYMMDDHHMM, 5-min steps, years deep).
+   EXPERIMENTAL: occasional missing frames are the archive's gaps, not the app's. */
+function radarSetSpan(min){
+  radarSpanMin=min;
+  // clear old archive layers
+  radarArchive.forEach((_,j)=>{try{map.getLayer("radarA"+j)&&map.removeLayer("radarA"+j);map.getSource("radarA"+j)&&map.removeSource("radarA"+j);}catch(e){}});
+  radarArchive=[];
+  if(min>50){
+    const N=12,step=min/N;
+    for(let j=0;j<N;j++){
+      const t=new Date(now()-(min-j*step)*6e4);
+      t.setUTCMinutes(Math.floor(t.getUTCMinutes()/5)*5,0,0);
+      const ts=t.toISOString().replace(/[-:TZ]/g,"").slice(0,12);
+      radarArchive.push({ts,label:(min-j*step)>=60?((min-j*step)/60).toFixed(1)+" h ago":(min-j*step)+" min ago"});
+      map.addSource("radarA"+j,{type:"raster",tileSize:256,
+        tiles:[`https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-${ts}/{z}/{x}/{y}.png`]});
+      map.addLayer({id:"radarA"+j,type:"raster",source:"radarA"+j,
+        layout:{visibility:"none"},paint:{"raster-opacity":0.72}},"county-lines");}
+    ledger("IEM NEXRAD archive","mesonet.agron.iastate.edu",`radar span ${min>=60?min/60+" h":min+" min"} — 12 archived frames (EXPERIMENTAL)`,"OK","MEASURED","archive frames can have gaps; missing imagery = archive gap, not new weather");
+  }
+  radarFrame=(min>50?radarArchive.length:RADAR_FRAMES.length)-1;radarShow(radarFrame);}
+function radarShow(i){
+  if(radarSpanMin>50){
+    RADAR_FRAMES.forEach((_,j)=>{try{map.getLayer("radar"+j)&&map.setLayoutProperty("radar"+j,"visibility","none");}catch(e){}});
+    radarArchive.forEach((f,j)=>{try{map.getLayer("radarA"+j)&&map.setLayoutProperty("radarA"+j,"visibility",j===i&&LAYERS.radar.on?"visible":"none");}catch(e){}});
+    $("radarLbl")&&($("radarLbl").textContent=radarArchive[i]?radarArchive[i].label+" (archive)":"");
+    return;}
+  $("radarLbl")&&($("radarLbl").textContent="");radarShowLive(i);}
+document.addEventListener("change",e=>{if(e.target&&e.target.id==="radarSpan")radarSetSpan(+e.target.value);});
 function radarPlay(on){
   radarPlaying=on;$("radarBar").classList.toggle("show",on||LAYERS.radar.on);
   clearInterval(radarTimer);
-  if(on){radarTimer=setInterval(()=>{radarFrame=(radarFrame+1)%RADAR_FRAMES.length;
-    radarShow(radarFrame);},radarFrame===RADAR_FRAMES.length-1?1400:450);
+  if(on){radarTimer=setInterval(()=>{radarFrame=(radarFrame+1)%radarCount();
+    radarShow(radarFrame);},radarFrame===radarCount()-1?1400:450);
     $("btnRadarPause").textContent="⏸";}
-  else{radarFrame=RADAR_FRAMES.length-1;if(LAYERS.radar.on)radarShow(radarFrame);$("btnRadarPause").textContent="▶";}}
+  else{radarFrame=radarCount()-1;if(LAYERS.radar.on)radarShow(radarFrame);$("btnRadarPause").textContent="▶";}}
 
 /* ---------- ambient rotation: the always-on beautiful globe ---------- */
 let ambientRAF=null,lastInteract=0,userBusy=false;
@@ -656,7 +751,7 @@ const LAYERS={
   alerts:{name:"Weather Alerts (US)",color:"#d96a5b",on:true,badge:"OFFICIAL",info:"alerts",maps:["alertpolys","alertlines"]},
   quakes:{name:"Earthquakes",color:"#e0b24b",on:true,badge:"MEASURED",info:"quakes",maps:["quakes"]},
   fires:{name:"Active Fires (FIRMS)",color:"#ff7a3c",on:true,badge:"MEASURED",info:"fires",maps:["fires"]},
-  ba:{name:"Grid Stress (all US BAs)",color:"#5fbf9f",on:true,badge:"MEASURED",info:"ba",maps:["ba"]},
+  ba:{name:"Grid Stress (all US BAs)",color:"#5fbf9f",on:true,badge:"MEASURED",info:"ba",maps:["ba","ba-halo"]},
   power:{name:"Power Infrastructure (OSM)",color:"#7fe0bd",on:true,badge:"MEASURED",info:"power",maps:["power-lines","power-subs","power-plants"]},
   iss:{name:"ISS",color:"#7fd4ff",on:true,badge:"MEASURED",info:"iss",maps:["iss","isstrail"]},
   aircraft:{name:"Aircraft (ADS-B)",color:"#b8c7ff",on:false,badge:"MEASURED",info:"aircraft",maps:["aircraft"]},
@@ -672,7 +767,7 @@ function applyLayerVisibility(){
   try{if(map.getLayer("isstrack"))map.setLayoutProperty("isstrack","visibility",LAYERS.iss&&LAYERS.iss.on?"visible":"none");}catch(e){}
   for(const k in LAYERS){const L=LAYERS[k];
     (L.maps||[]).forEach(m=>{if(map.getLayer(m))map.setLayoutProperty(m,"visibility",L.on?"visible":"none");});}
-  if(LAYERS.radar.on&&!radarPlaying)radarShow(RADAR_FRAMES.length-1);
+  if(LAYERS.radar.on&&!radarPlaying)radarShow(radarCount()-1);
   $("radarBar").classList.toggle("show",LAYERS.radar.on||radarPlaying);}
 function renderLayerList(){
   $("layerList").innerHTML=Object.entries(LAYERS).map(([k,L])=>{
@@ -682,6 +777,7 @@ function renderLayerList(){
     <span class="lname">${L.name}</span>
     <span class="badge b-${L.badge.toLowerCase()}">${L.badge}</span>
     <span class="fresh">${a?fmtAge(a):"—"}</span>
+    <button class="ibtn" data-locate="${k}" title="blink this layer on the map and fly to its data">◎</button>
     <button class="ibtn" data-info="${L.info}">i</button></div>`;}).join("");}
 const FRESH={};
 document.addEventListener("click",e=>{const s=e.target.closest(".sw[data-layer]");if(!s)return;
@@ -757,6 +853,39 @@ function rebuildSats(){
       out.push({name:s.name,grp:g,lat:satellite.degreesLat(gd.latitude),lon:satellite.degreesLong(gd.longitude),alt:gd.height});}catch(e){}}
   S.sats=out;gj("sats");}
 
+/* ---- Highlight pulse: click any BA/alert/anomaly and the map shows you WHERE ---- */
+let hlTimer=null,hlPhase=0;
+function pulseAt(lon,lat,label){
+  if(!map.getSource("hl"))return;
+  map.getSource("hl").setData({type:"FeatureCollection",features:[{type:"Feature",
+    geometry:{type:"Point",coordinates:[lon,lat]},properties:{label:label||""}}]});
+  clearInterval(hlTimer);hlPhase=0;
+  hlTimer=setInterval(()=>{hlPhase++;
+    const r=16+14*Math.abs(Math.sin(hlPhase/4));
+    try{map.setPaintProperty("hl","circle-radius",r);
+        map.setPaintProperty("hl","circle-stroke-opacity",0.35+0.6*Math.abs(Math.cos(hlPhase/4)));}catch(e){}
+    if(hlPhase>90){clearInterval(hlTimer);map.getSource("hl").setData({type:"FeatureCollection",features:[]});}
+  },90);}
+function pulseLayer(k){
+  const L=LAYERS[k];if(!L)return;
+  if(!L.on){L.on=true;applyLayerVisibility();renderLayerList();}
+  let n=0;const iv=setInterval(()=>{n++;
+    L.maps.forEach(id=>{try{if(map.getLayer(id))map.setLayoutProperty(id,"visibility",n%2?"none":"visible");}catch(e){}});
+    if(n>=6){clearInterval(iv);applyLayerVisibility();}},280);
+  // fly to the layer's data extent when it's a point/line geojson we hold in state
+  try{const srcId=L.maps[0];const src=SRC[srcId]&&SRC[srcId]();
+    if(src&&src.features&&src.features.length){
+      let minX=180,maxX=-180,minY=90,maxY=-90;const scan=c=>{if(typeof c[0]==="number"){minX=Math.min(minX,c[0]);maxX=Math.max(maxX,c[0]);minY=Math.min(minY,c[1]);maxY=Math.max(maxY,c[1]);}else c.forEach(scan);};
+      src.features.forEach(f=>scan(f.geometry.coordinates));
+      if(minX<=maxX)map.fitBounds([[minX,minY],[maxX,maxY]],{padding:80,maxZoom:9,duration:1600});}}catch(e){}}
+document.addEventListener("click",e=>{const l=e.target.closest("[data-locate]");if(l){e.stopPropagation();pulseLayer(l.dataset.locate);}});
+function flyPulse(lon,lat,z,label){map.flyTo({center:[lon,lat],zoom:z||5.2,duration:1800});pulseAt(lon,lat,label);}
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-bafly]");if(b){const c=BA_CENTROIDS[b.dataset.bafly];
+    if(c)flyPulse(c.lon,c.lat,5.4,b.dataset.bafly);return;}
+  const g=e.target.closest("[data-fly]");if(g){const[lo,la,z]=g.dataset.fly.split(",").map(Number);
+    if(isFinite(lo)&&isFinite(la))flyPulse(lo,la,z||7);}});
+
 /* ---- ISS ground track: real TLE + SGP4, split at the date line so the "NASA wave" draws cleanly ---- */
 async function updateIssTrack(){
   if(!LAYERS.iss||!LAYERS.iss.on||typeof satellite==="undefined")return;
@@ -778,6 +907,27 @@ async function updateIssTrack(){
     S.issTrack=segs;gj("isstrack");
   }catch(e){wd("iss","warn","track: "+e.message);}}
 setInterval(updateIssTrack,60000);map.on("load",()=>setTimeout(updateIssTrack,3000));
+
+/* ---- Follow ISS: camera locks onto the station, propagated smoothly between fixes ---- */
+let followISS=false,followTimer=null;
+function setFollowISS(on){
+  followISS=on;$("btnFollowISS").classList.toggle("on",on);
+  clearInterval(followTimer);
+  if(on){
+    if(LAYERS.iss&&!LAYERS.iss.on){LAYERS.iss.on=true;applyLayerVisibility();renderLayerList();}
+    if(S.ambient)setAmbient(false); // follow and orbit both drive the camera — follow wins while on
+    updateIssTrack();
+    const step=()=>{let p=null;
+      if(S.issRec&&typeof satellite!=="undefined"){try{const t=new Date(),pv=satellite.propagate(S.issRec.rec,t);
+        if(pv.position){const gd=satellite.eciToGeodetic(pv.position,satellite.gstime(t));
+          p={lon:satellite.degreesLong(gd.longitude),lat:satellite.degreesLat(gd.latitude)};}}catch(e){}}
+      if(!p&&S.iss)p={lon:S.iss.lon,lat:S.iss.lat};
+      if(p)map.easeTo({center:[p.lon,p.lat],zoom:Math.max(map.getZoom(),3),duration:1900,essential:true});};
+    step();followTimer=setInterval(step,2000);
+    ledger("Follow ISS","","camera locked to ISS (SGP4-propagated between fixes)","OK","MODELED","drag the map to release; positions km-scale accurate");
+  }else ledger("Follow ISS","","released","OK","OFFICIAL","");}
+$("btnFollowISS").addEventListener("click",e=>{if(e.target.closest(".ibtn"))return;setFollowISS(!followISS);});
+map.on("dragstart",e=>{if(e&&e.originalEvent&&followISS)setFollowISS(false);}); // your hand beats the autopilot
 
 /* ---- Power-flow line animation: moving dashes show direction (representation, not literal electrons) ---- */
 const FLOW_DASH=[[0,2,3],[1,2,2],[2,2,1],[3,2,0]];let flowStep=0;
@@ -840,22 +990,45 @@ alerts:{name:"NWS Alerts",int:180,staleSec:900,enabled:()=>true,
   gj("alertpolys");FRESH.alerts=now();
   ledger("NWS","api.weather.gov",`${local.length} local + ${national.length} national severe alerts`,"OK","OFFICIAL","county alerts may lack polygons");}},
 meteo:{name:"Open-Meteo Conditions",int:600,staleSec:2400,enabled:()=>true,
- run:async()=>{const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${S.loc.lat}&longitude=${S.loc.lon}&current=temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m,wind_gusts_10m&temperature_unit=fahrenheit&wind_speed_unit=mph`);
-  if(!r.ok)throw new Error("HTTP "+r.status);const j=await r.json();S.meteo=j.current;FRESH.meteo=now();
-  ledger("Open-Meteo","api.open-meteo.com","local conditions ok","OK","MEASURED","model-derived, not a station");}},
+ run:async()=>{const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${S.loc.lat}&longitude=${S.loc.lon}&current=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,wind_speed_10m,wind_gusts_10m&hourly=temperature_2m,precipitation_probability&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset&forecast_days=7&timezone=auto&temperature_unit=fahrenheit&wind_speed_unit=mph`);
+  if(!r.ok)throw new Error("HTTP "+r.status);const j=await r.json();S.meteo=j.current;
+  S.wx={hourly:j.hourly,daily:j.daily};FRESH.meteo=now();
+  ledger("Open-Meteo","api.open-meteo.com","conditions + hourly + 7-day forecast","OK","MEASURED/MODELED","current = model nowcast; forecast = model, verify big decisions against NWS point forecast");}},
 kp:{name:"SWPC Planetary Kp",int:300,staleSec:1500,enabled:()=>true,
  run:async()=>{const r=await fetch("https://services.swpc.noaa.gov/json/planetary_k_index_1m.json");
   if(!r.ok)throw new Error("HTTP "+r.status);const j=await r.json();const last=j[j.length-1];
   S.kp={v:+last.kp_index,t:Date.parse(last.time_tag)};FRESH.spacewx=now();
   ledger("NOAA SWPC","services.swpc.noaa.gov","Kp="+S.kp.v,"OK","MEASURED","estimated Kp; definitive published later");}},
 wind:{name:"SWPC Solar Wind (DSCOVR)",int:300,staleSec:1500,enabled:()=>true,
- run:async()=>{const r=await fetch("https://services.swpc.noaa.gov/products/solar-wind/plasma-1-day.json");
-  if(!r.ok)throw new Error("HTTP "+r.status);const j=await r.json();const last=j[j.length-1];
-  S.wind={speed:+last[2],dens:+last[1],t:Date.parse(last[0]+"Z")};
+ run:async()=>{let last=null;
+  try{const r=await fetch("https://services.swpc.noaa.gov/products/solar-wind/plasma-1-day.json");
+    if(!r.ok)throw new Error("HTTP "+r.status);const j=await r.json();last=j[j.length-1];
+    S.wind={speed:+last[2],dens:+last[1],t:Date.parse(last[0]+"Z")};
+  }catch(e1){ // fallback: SWPC's alternate real-time-solar-wind JSON product
+    const r2=await fetch("https://services.swpc.noaa.gov/json/rtsw/rtsw_wind_1m.json");
+    if(!r2.ok)throw new Error("plasma-1-day ("+e1.message+") and rtsw_wind ("+r2.status+") both failed — chip card links the SWPC dashboard");
+    const j2=await r2.json();const L=j2[0]||j2[j2.length-1];
+    S.wind={speed:+(L.proton_speed||L.speed),dens:+(L.proton_density||L.density),t:Date.parse((L.time_tag||"")+(String(L.time_tag).endsWith("Z")?"":"Z"))};
+    ledger("SWPC rtsw (fallback)","services.swpc.noaa.gov","solar wind via alternate product","OK","MEASURED","same DSCOVR instrument, different pipeline");}
+  if(!S.wind||!isFinite(S.wind.speed)){ // last resort: SWPC summary product (tiny, very reliable)
+    const r3=await fetch("https://services.swpc.noaa.gov/products/summary/solar-wind-speed.json");
+    if(r3.ok){const j3=await r3.json();S.wind={speed:+j3.WindSpeed,dens:S.wind?S.wind.dens:null,t:Date.parse(j3.TimeStamp+"Z")||now()};
+      ledger("SWPC summary (fallback 2)","services.swpc.noaa.gov","wind speed via summary product","OK","MEASURED","headline value only");}}
   ledger("NOAA SWPC","services.swpc.noaa.gov","solar wind "+Math.round(S.wind.speed)+" km/s","OK","MEASURED","L1 measurement, 15–60 min upstream");}},
 imf:{name:"SWPC IMF Bz/Bt (DSCOVR mag)",int:300,staleSec:1500,enabled:()=>true,
- run:async()=>{const r=await fetch("https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json");
-  if(!r.ok)throw new Error("HTTP "+r.status);const j=await r.json();const last=j[j.length-1];
+ run:async()=>{let j,last;
+  try{const r=await fetch("https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json");
+    if(!r.ok)throw new Error("HTTP "+r.status);j=await r.json();last=j[j.length-1];
+  }catch(e1){
+    const r2=await fetch("https://services.swpc.noaa.gov/json/rtsw/rtsw_mag_1m.json");
+    if(!r2.ok)throw new Error("mag-1-day ("+e1.message+") and rtsw_mag ("+r2.status+") both failed — chip card links the SWPC dashboard");
+    const j2=await r2.json();const L=j2[0]||j2[j2.length-1];
+    S.imf={bz:+(L.bz_gsm),bt:+(L.bt),t:Date.parse((L.time_tag||"")+(String(L.time_tag).endsWith("Z")?"":"Z"))};
+    ledger("SWPC rtsw (fallback)","services.swpc.noaa.gov",`IMF via alternate product: Bz ${S.imf.bz.toFixed(1)} nT`,"OK","MEASURED","same instrument, different pipeline");return;}
+  if(!last){const r3=await fetch("https://services.swpc.noaa.gov/products/summary/solar-wind-mag-field.json");
+    if(r3.ok){const j3=await r3.json();S.imf={bz:+j3.Bz,bt:+j3.Bt,t:Date.parse(j3.TimeStamp+"Z")||now()};
+      ledger("SWPC summary (fallback 2)","services.swpc.noaa.gov",`Bz ${S.imf.bz} nT via summary product`,"OK","MEASURED","headline value only");return;}
+    throw new Error("all SWPC mag products unavailable");}
   // columns: time_tag, bx_gsm, by_gsm, bz_gsm, lon, lat, bt
   S.imf={bz:+last[3],bt:+last[6],t:Date.parse(last[0]+"Z")};
   ledger("NOAA SWPC","services.swpc.noaa.gov",`IMF Bz ${S.imf.bz>=0?"+":""}${S.imf.bz.toFixed(1)} nT · Bt ${S.imf.bt.toFixed(1)} nT`,"OK","MEASURED","L1 measurement; sustained southward (negative) Bz is the storm-coupling condition");}},
@@ -1021,7 +1194,7 @@ function applyMock(on){
    ===================================================================== */
 function runAnomalyEngine(){
   const A=[],loc=S.loc;
-  const push=(sev,conf,title,why,src,more)=>A.push({sev,conf,title,why,src,more,mock:S.mock});
+  const push=(sev,conf,title,why,src,more,geo)=>A.push({sev,conf,title,why,src,more,geo,mock:S.mock});
   if(S.kp&&S.kp.v>=5)push(S.kp.v>=7?3:2,"HIGH",`Geomagnetic storm level Kp ${S.kp.v.toFixed(1)}`,
     "Planetary Kp at storm level. Elevated probability of GPS degradation, HF radio issues, aurora at unusual latitudes, and grid-operator mitigation actions. Watch condition, not an outage prediction.",
     "NOAA SWPC","Sustained Kp≥7, rising solar wind speed, or an SWPC G-scale alert would increase confidence.");
@@ -1039,25 +1212,43 @@ function runAnomalyEngine(){
     const big=nearQ.filter(q=>q.mag>=4);
     if(big.length)push(2,"HIGH",`M${big[0].mag.toFixed(1)} earthquake within 300 mi of ${loc.name.split(",")[0]}`,
       `${big.length} event(s) ≥M4 in the last 24 h near your location. Details on map markers.`,
-      "USGS","Aftershock sequence data over the next hours.");
+      "USGS","Aftershock sequence data over the next hours.",{lon:big[0].lon,lat:big[0].lat,z:8});
     else if(nearQ.length>=6)push(1,"MEDIUM",`Quake cluster: ${nearQ.length} events within 300 mi (24 h)`,
       "More small events than a quiet baseline. Small-quake clusters are common and usually end without a larger event.",
       "USGS","A rising magnitude trend within the cluster would increase concern; declining trend decreases it.");
     const nearF=S.fires.filter(f=>haversine(loc.lat,loc.lon,f.lat,f.lon)<160);
     if(nearF.length)push(2,"MEDIUM",`${nearF.length} thermal detection(s) within 100 mi`,
       "Satellite heat anomalies nearby. Could be wildfire, controlled burn, or industrial heat.",
-      "NASA FIRMS","Persistence across satellite passes + an NWS fire weather product would increase confidence.");
+      "NASA FIRMS","Persistence across satellite passes + an NWS fire weather product would increase confidence.",{lon:nearF[0].lon,lat:nearF[0].lat,z:9});
     const sevLocal=S.alerts.filter(a=>a.local&&(a.sev==="Severe"||a.sev==="Extreme"));
     if(sevLocal.length)push(3,"OFFICIAL",`${sevLocal[0].event} — official alert for your location`,
-      sevLocal[0].headline||"","NWS (official)","This IS an official alert — act on NWS guidance, not on this app.");
+      sevLocal[0].headline||"","NWS (official)","This IS an official alert — act on NWS guidance, not on this app.",{lon:loc.lon,lat:loc.lat,z:9});
   }
   const stressed=Object.values(S.ba).filter(b=>b.d&&b.df&&b.d/b.df>1.05);
   for(const b of stressed.slice(0,4))push(2,"MEDIUM",`${b.code} demand ${((b.d/b.df-1)*100).toFixed(1)}% above its own forecast`,
     `${b.name}: hourly demand exceeding day-ahead forecast. Operators handle this routinely; flagged because the gap is large. Correlation hypothesis, not an outage prediction.`,
-    "EIA-930","Reserve-margin data (not public in EIA-930) or an operator conservation appeal would increase confidence.");
+    "EIA-930","Reserve-margin data (not public in EIA-930) or an operator conservation appeal would increase confidence.",BA_CENTROIDS[b.code]?{lon:BA_CENTROIDS[b.code].lon,lat:BA_CENTROIDS[b.code].lat,z:5.4}:null);
   if(S.kp&&S.kp.v>=6&&Object.keys(S.ba).length)push(2,"MEDIUM","Geomagnetic storm while grid monitoring is active",
     "Kp≥6 concurrent with grid observation. Geomagnetically induced currents are possible at storm levels; impact is operator-managed. Watch condition.",
     "SWPC + EIA-930","A NOAA G3+ alert naming grid impacts would increase confidence.");
+  /* ---- Cross-layer intelligence rules ---- */
+  const stressedBAs=Object.values(S.ba).filter(b=>b.d&&b.df&&b.d/b.df>1.06);
+  if(stressedBAs.length>=3)push(3,"MEDIUM",`Systemic grid stress: ${stressedBAs.length} balancing authorities above forecast simultaneously`,
+    `${stressedBAs.map(b=>b.code).join(", ")} are all running ≥6% over their own demand forecasts in the same hour. Simultaneous multi-region stress usually traces to a shared driver — continental heat/cold, or a data/forecast artifact.`,
+    "EIA-930 cross-region comparison","Check the Weather layer for a matching temperature pattern; an EIA data artifact would show as an implausible step-change in the Grid tab.",
+    stressedBAs[0]&&BA_CENTROIDS[stressedBAs[0].code]?{lon:BA_CENTROIDS[stressedBAs[0].code].lon,lat:BA_CENTROIDS[stressedBAs[0].code].lat,z:4}:null);
+  const geomagActive=(S.kp&&S.kp.v>=6)||(S.imf&&S.imf.bz<=-10);
+  if(geomagActive&&stressedBAs.length)push(3,"LOW",`Geomagnetic activity coinciding with grid stress (${stressedBAs.map(b=>b.code).join(", ")})`,
+    "A geomagnetic disturbance is in progress while grid regions run above forecast. These are USUALLY unrelated — demand stress is almost always weather-driven — but strong storms (G3+) can induce currents that operators actively manage. This is a co-occurrence note, not a causal claim.",
+    "NOAA SWPC + EIA-930","An SWPC G3+ alert AND an operator advisory (e.g. TXANS) naming geomagnetic currents would connect them; absent both, assume coincidence.");
+  if(S.xray&&S.xray.flux>=1e-5&&S.kp&&S.kp.v>=5)push(2,"MEDIUM","Flare-then-storm sequence in progress",
+    `M-class or stronger X-ray flux with Kp already at ${S.kp.v.toFixed(1)}. Flares affect HF radio on the dayside within minutes; any associated CME arrives 1–3 DAYS later — the sequence matters more than either number alone.`,
+    "NOAA SWPC (GOES + DSCOVR)","A CME entry in the DONKI feed with an Earth-directed model run.");
+  const sevLocal=S.alerts.some(a=>a.local&&(a.sev==="Extreme"||a.sev==="Severe"));
+  const darkFeeds=Object.keys(ADAPTERS).filter(k=>ADAPTERS[k].lastErr&&ADAPTERS[k].lastOk&&now()-ADAPTERS[k].lastOk>9e5&&ADAPTERS[k].enabled());
+  if(sevLocal&&darkFeeds.length)push(2,"LOW",`Feed(s) dark during an active severe alert: ${darkFeeds.map(k=>(FEEDMETA[k]||{lbl:k}).lbl).join(", ")}`,
+    "A normally-working source stopped answering while an official severe alert is active for your area. The boring explanation — server load during big weather — is also the most likely one. Flagged because your spec says a feed going quiet during an event is itself information.",
+    "Watchdog cross-check","The feed chip's official-site link showing the SAME gap would confirm a provider outage rather than a local network issue.");
   /* ---- Baseline unusualness: counts near your location vs YOUR OWN recorded history ---- */
   const q480=S.quakes.filter(q=>!q.mock&&haversine(loc.lat,loc.lon,q.lat,q.lon)<=480).length;
   const f160=S.fires.filter(f=>!f.mock&&haversine(loc.lat,loc.lon,f.lat,f.lon)<=160).length;
@@ -1071,7 +1262,7 @@ function runAnomalyEngine(){
       const test=(cnt,key,label,src)=>{const m=med(base.map(b=>b[key]));
         if(cnt>=3&&cnt>Math.max(2*m,m+3))push(2,conf,`Unusual number of ${label} near ${loc.name.split(",")[0]}: ${cnt} vs typical ~${m}`,
           `Compared against YOUR ${days}-day recorded baseline for this app, not a scientific climatology. Pattern detected — could also reflect improved detection, feed changes, or normal clustering.`,
-          src,`A longer baseline (14+ days) and agreement from official sources would increase confidence. Baseline so far: ${days} day(s).`);};
+          src,`A longer baseline (14+ days) and agreement from official sources would increase confidence. Baseline so far: ${days} day(s).`,{lon:loc.lon,lat:loc.lat,z:8});};
       test(q480,"q","earthquakes (within 300 mi)","USGS");
       test(f160,"f","fire detections (within 100 mi)","NASA FIRMS");
       test(aLoc,"a","active weather alerts (local)","NWS");
@@ -1080,7 +1271,7 @@ function runAnomalyEngine(){
                      aLoc>Math.max(2*med(base.map(b=>b.a)),med(base.map(b=>b.a))+3)&&aLoc>=3].filter(Boolean).length;
       if(flagged>=2)push(3,conf,"Multiple layers elevated at once near "+loc.name.split(",")[0],
         "Two or more independent public feeds are simultaneously above your recorded baseline. Cross-source agreement is stronger evidence than any single feed — still a correlation, not a proven cause.",
-        "Cross-layer pattern engine","Official alerts naming the same event would confirm.");
+        "Cross-layer pattern engine","Official alerts naming the same event would confirm.",{lon:loc.lon,lat:loc.lat,z:8});
     }
     // record a snapshot at most every 6 h, keep ~60 (≈15 days at 4/day)
     const last=base[base.length-1];
@@ -1100,7 +1291,9 @@ function renderBrief(){
   const locAl=S.alerts.filter(a=>a.local);
   $("brief").innerHTML=`<div style="font-size:13px;color:var(--vir3);margin-bottom:5px">${esc(l.name)}</div>
   ${S.meteo?`<div class="brief-metric"><span>Temp / humidity</span><span class="v">${Math.round(S.meteo.temperature_2m)}°F · ${S.meteo.relative_humidity_2m}%</span></div>
+  <div class="brief-metric"><span>Feels like</span><span class="v">${S.meteo.apparent_temperature!=null?Math.round(S.meteo.apparent_temperature)+"°F":"—"}</span></div>
   <div class="brief-metric"><span>Wind / gusts</span><span class="v">${Math.round(S.meteo.wind_speed_10m)} / ${Math.round(S.meteo.wind_gusts_10m)} mph</span></div>`:""}
+  ${wxExtras()}
   <div class="brief-metric"><span>Active NWS alerts here</span><span class="v">${locAl.length}</span></div>
   <div class="brief-metric"><span>Nearest quake (24h)</span><span class="v">${nearestQ?`M${nearestQ.q.mag.toFixed(1)} · ${Math.round(nearestQ.d)} km`:"none"}</span></div>
   <div class="brief-metric"><span>Nearest fire detection</span><span class="v">${nearestF?Math.round(nearestF.d)+" km":cfg.firmsKey?"none":"needs key"}</span></div>
@@ -1110,18 +1303,63 @@ function renderBrief(){
   <div class="brief-metric"><span>Moon <button class="ibtn" data-info="moon">i</button></span><span class="v">${m.name} · ${m.illum}%</span></div>
   <button class="subbtn" id="btnSkyLab">☾ Sky &amp; Eclipse Lab — how phases and eclipses work</button>
   <div class="finer" style="margin-top:6px">Conditions <span class="badge b-measured">MEASURED</span> · moon <span class="badge b-modeled">MODELED</span>${S.mock?' · <span class="badge b-mock">MOCK MODE</span>':""}</div>`;}
-function renderAnomalies(){
-  const list=S.anomalies.filter(a=>!S.integrity||a.conf==="HIGH"||a.conf==="OFFICIAL");
-  $("anomList").innerHTML=list.length?list.map(a=>`<div class="anom s${a.sev}">
-    <b>${esc(a.title)}</b>${a.mock?' <span class="badge b-mock">MOCK</span>':""}
+function anomCard(a){return `<div class="anom s${a.sev} ${a.geo?"canfly":""}"${a.geo?` data-fly="${a.geo.lon},${a.geo.lat},${a.geo.z||7}" title="tap: show on map"`:` title="global condition — no single location"`}>
+    <b>${a.geo?"◎ ":"🌐 "}${esc(a.title)}</b>${a.mock?' <span class="badge b-mock">MOCK</span>':""}
     <div class="why">${esc(a.why)}</div>
     <div class="meta">confidence ${a.conf} · src: ${esc(a.src)}</div>
-    <div class="meta">↑ confidence if: ${esc(a.more)}</div></div>`).join("")
-    :`<div class="finer">Nothing anomalous flagged. Quiet is a valid result.</div>`;}
+    <div class="meta">↑ confidence if: ${esc(a.more)}</div></div>`;}
+function wxExtras(){
+  if(!S.wx||!S.wx.hourly)return "";
+  const H=S.wx.hourly,D=S.wx.daily;
+  // next precipitation callout (Carrot-style "rain starting at…")
+  let nextP="";const nowH=new Date().toISOString().slice(0,13);
+  const i0=H.time.findIndex(t=>t.slice(0,13)>=nowH);
+  if(i0>=0){const iP=H.precipitation_probability.slice(i0,i0+24).findIndex(p=>p>=50);
+    nextP=iP<0?"none likely in 24 h":`~${new Date(H.time[i0+iP]).toLocaleTimeString([],{hour:"numeric"})} (${H.precipitation_probability[i0+iP]}% prob)`;}
+  const sr=D&&D.sunrise?new Date(D.sunrise[0]).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}):"—";
+  const ss=D&&D.sunset?new Date(D.sunset[0]).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}):"—";
+  const days=D?D.time.map((t,i)=>`<div style="flex:1;text-align:center"><div class="finer">${new Date(t+"T12:00").toLocaleDateString([],{weekday:"short"})}</div>
+    <div style="font-size:11px">${Math.round(D.temperature_2m_max[i])}°</div><div class="finer">${Math.round(D.temperature_2m_min[i])}°</div>
+    <div class="finer" style="color:#5bb8d9">${D.precipitation_probability_max[i]}%</div></div>`).join(""):"";
+  setTimeout(drawWxSpark,60);
+  return `<div class="brief-metric"><span>Next precip ≥50%</span><span class="v">${nextP}</span></div>
+  <div class="brief-metric"><span>Sunrise / sunset</span><span class="v">${sr} / ${ss}</span></div>
+  <canvas id="wxSpark" width="560" height="86" style="width:100%;margin:4px 0;background:#04120c;border-radius:8px"></canvas>
+  <div style="display:flex;gap:2px;margin:2px 0 6px">${days}</div>`;}
+function drawWxSpark(){
+  const cv=document.getElementById("wxSpark");if(!cv||!S.wx||!S.wx.hourly)return;
+  const g=cv.getContext("2d");g.clearRect(0,0,cv.width,cv.height);
+  const H=S.wx.hourly,nowH=new Date().toISOString().slice(0,13);
+  let i0=H.time.findIndex(t=>t.slice(0,13)>=nowH);if(i0<0)i0=0;
+  const T=H.temperature_2m.slice(i0,i0+24),P=H.precipitation_probability.slice(i0,i0+24);
+  if(!T.length)return;
+  const min=Math.min(...T),max=Math.max(...T),pad=24,W=cv.width-pad*2,Hh=cv.height;
+  const X=i=>pad+i/(T.length-1)*W, Y=t=>14+(1-(t-min)/Math.max(1,max-min))*(Hh-38);
+  P.forEach((p,i)=>{if(p>0){g.fillStyle="rgba(91,184,217,0.35)";const bh=p/100*(Hh-30);
+    g.fillRect(X(i)-3,Hh-14-bh,6,bh);}});
+  g.strokeStyle="#e0b24b";g.lineWidth=2;g.beginPath();
+  T.forEach((t,i)=>{i?g.lineTo(X(i),Y(t)):g.moveTo(X(i),Y(t));});g.stroke();
+  g.fillStyle="#9fb8ae";g.font="10px sans-serif";
+  g.fillText(Math.round(max)+"°",2,Y(max)+4);g.fillText(Math.round(min)+"°",2,Y(min)+4);
+  [0,6,12,18,23].forEach(i=>{if(H.time[i0+i])g.fillText(new Date(H.time[i0+i]).toLocaleTimeString([],{hour:"numeric"}),X(i)-8,Hh-2);});
+  g.fillStyle="#5bb8d9";g.fillText("bars = precip %",cv.width-84,10);}
+function sitrep(){
+  const L=S.anomalies;if(!L.length)return `<div class="finer" style="border:1px solid #163026;border-radius:8px;padding:6px 8px;margin-bottom:6px"><b>SITREP — QUIET.</b> ${Object.keys(ADAPTERS).length} feeds instrumented, no anomalies above threshold. Quiet is a finding, not a gap.</div>`;
+  const mx=Math.max(...L.map(a=>a.sev));
+  const posture=mx>=3?"ELEVATED":mx>=2?"WATCH":"ADVISORY";
+  const top=L.slice(0,3).map(a=>a.title).join(" · ");
+  const off=L.filter(a=>a.conf==="OFFICIAL").length;
+  return `<div class="finer" style="border:1px solid ${mx>=3?"#5a2a34":"#163026"};border-radius:8px;padding:6px 8px;margin-bottom:6px">
+    <b>SITREP — ${posture}.</b> ${L.length} finding(s), ${off} carrying official-alert weight. Leading: ${esc(top)}.
+    Each item below states its source, confidence, and what would raise it — read those before reacting. No finding here is a prediction.</div>`;}
+function renderAnomalies(){
+  const list=S.anomalies.filter(a=>!S.integrity||a.conf==="HIGH"||a.conf==="OFFICIAL");
+  $("anomList").innerHTML=sitrep()+(list.length?list.map(anomCard).join("")
+    :`<div class="finer">Nothing anomalous flagged. Quiet is a valid result.</div>`);}
 function renderBaMini(){
   const rows=Object.values(S.ba).filter(b=>b.d&&b.df).sort((a,b)=>b.d/b.df-a.d/a.df).slice(0,8);
   $("baMini").innerHTML=rows.length?`<table>${rows.map(b=>{const s=b.d/b.df;
-    return`<tr><td>${b.code}</td><td>${(b.d/1e3).toFixed(1)} GWh</td>
+    return`<tr style="cursor:pointer" data-bafly="${b.code}" title="fly to ${b.code} and pulse it"><td>${b.code} ◎</td><td>${(b.d/1e3).toFixed(1)} GWh</td>
     <td style="color:${s>1.04?"var(--bad)":s>0.99?"var(--warn)":"#4ecb8d"}">${((s-1)*100).toFixed(1)}%</td></tr>`;}).join("")}</table>
     <div class="finer">vs own forecast · top 8 · click circles on map for all</div>`:"";}
 let curTab="alerts";
@@ -1186,12 +1424,16 @@ function renderTab(){
   const B=$("tabBody");
   if(curTab==="alerts"){const list=S.alerts.filter(a=>a.local||a.sev==="Extreme"||a.sev==="Severe");
     B.innerHTML=list.length?`<table><tr><th>Event</th><th>Severity</th><th>Area</th><th>From</th></tr>`+
-      list.slice(0,60).map(a=>`<tr><td>${esc(a.event)}${a.mock?' <span class="badge b-mock">MOCK</span>':""}</td><td>${esc(a.sev||"")}</td><td>${esc((a.area||"").slice(0,70))}</td><td>${esc(a.sender||"NWS")}</td></tr>`).join("")+"</table>"
+      list.slice(0,60).map(a=>{let fl="";if(a.geom&&a.geom.coordinates){try{const c=a.geom.type==="Polygon"?a.geom.coordinates[0]:a.geom.coordinates[0][0];
+        const lo=c.reduce((s,p)=>s+p[0],0)/c.length,la=c.reduce((s,p)=>s+p[1],0)/c.length;
+        fl=` style="cursor:pointer" data-fly="${lo.toFixed(3)},${la.toFixed(3)},8" title="show on map"`;}catch(e){}}
+      else if(a.local)fl=` style="cursor:pointer" data-fly="${cfg.home.lon},${cfg.home.lat},9" title="near your home location"`;
+      return `<tr${fl}><td>${fl?"◎ ":""}${esc(a.event)}${a.mock?' <span class="badge b-mock">MOCK</span>':""}</td><td>${esc(a.sev||"")}</td><td>${esc((a.area||"").slice(0,70))}</td><td>${esc(a.sender||"NWS")}</td></tr>`;}).join("")+"</table>"
       :`<div class="finer">No active alerts for your location, and no Extreme/Severe alerts fetched nationally. Quiet is a valid result.</div>`;}
   if(curTab==="grid"){const rows=Object.values(S.ba).filter(b=>b.d).sort((a,b)=>(b.d/b.df||0)-(a.d/a.df||0));
     B.innerHTML=cfg.eiaKey||S.mock?(rows.length?`<table><tr><th>BA</th><th>Region</th><th>Demand MWh</th><th>Forecast MWh</th><th>Δ vs forecast</th><th>Hour (UTC)</th></tr>`+
-      rows.map(b=>{const s=b.df?b.d/b.df:null;
-      return`<tr><td>${b.code}</td><td>${esc(b.name)}</td><td>${Math.round(b.d).toLocaleString()}</td><td>${b.df?Math.round(b.df).toLocaleString():"—"}</td>
+      rows.map(b=>{const s=b.df?b.d/b.df:null;const _fly=` style="cursor:pointer" data-bafly="${b.code}" title="fly to ${b.code} and pulse it"`;
+      return`<tr${_fly}><td>${b.code} ◎</td><td>${esc(b.name)}</td><td>${Math.round(b.d).toLocaleString()}</td><td>${b.df?Math.round(b.df).toLocaleString():"—"}</td>
       <td style="color:${s>1.04?"var(--bad)":s>0.99?"var(--warn)":"#4ecb8d"}">${s?((s-1)*100).toFixed(1)+"%":"—"}</td><td>${esc(b.period||"")}</td></tr>`;}).join("")+
       `</table><div class="finer" style="margin-top:6px">Every US balancing authority EIA publishes, one call — no region picking. Hourly with ~1–2 h lag <span class="badge b-measured">MEASURED</span>. Not real-time SCADA; the true second-by-second stream is operator-internal and not public — this app will not pretend otherwise.</div>`
       :`<div class="finer">Waiting for first EIA fetch…</div>`)
@@ -1203,6 +1445,9 @@ function renderTab(){
     B.innerHTML=Object.entries(WD).map(([k,w])=>`<div style="padding:3px 0"><span class="status-dot s-${w.state}"></span>
     <b style="font-size:12px">${esc(names[k]||k)}</b> <span class="finer">${esc(w.info)} · checked ${fmtAge(w.t)} ago</span></div>`).join("")||
     `<div class="finer">First sweep pending…</div>`;}
+  if(curTab==="anomalies"){
+    const list=S.anomalies.filter(a=>!S.integrity||a.conf==="HIGH"||a.conf==="OFFICIAL");
+    B.innerHTML=sitrep()+(list.length?list.map(anomCard).join(""):`<div class="finer">Nothing anomalous flagged. Quiet is a valid result.</div>`);}
   if(curTab==="registry"){
     const tierName={1:"Official operational",2:"Official dataset/science",3:"Aggregator",4:"Open/crowdsourced",5:"Secondary mirror",6:"Model/inference",7:"User journal"};
     const row=r=>`<tr><td>${r.m==="grid"?"⚡":"🌍"}</td><td>${r.u?`<a href="${r.u}" target="_blank" rel="noopener" style="color:var(--vir3)">${esc(r.n)} ↗</a>`:esc(r.n)}</td>
@@ -1231,6 +1476,15 @@ document.querySelectorAll(".tab").forEach(t=>t.addEventListener("click",e=>{
   document.querySelectorAll(".tab").forEach(x=>x.classList.remove("on"));t.classList.add("on");
   curTab=t.dataset.tab;renderTab();}));
 $("btnHelp").addEventListener("click",openHelpIndex);
+/* ---- phone nav: one sheet at a time; Map closes all ---- */
+document.querySelectorAll("[data-mnav]").forEach(b=>b.addEventListener("click",()=>{
+  const cls=b.dataset.mnav;
+  ["m-left","m-right","m-bottom"].forEach(c=>document.body.classList.toggle(c,c===cls&&!document.body.classList.contains(c)));
+  document.querySelectorAll("[data-mnav]").forEach(x=>x.classList.toggle("on",
+    x.dataset.mnav&&document.body.classList.contains(x.dataset.mnav)));
+  setTimeout(()=>map.resize(),60);}));
+window.addEventListener("resize",()=>setTimeout(()=>map.resize(),120));
+window.addEventListener("orientationchange",()=>setTimeout(()=>map.resize(),300));
 $("btnFullscreen").addEventListener("click",()=>{
   if(document.fullscreenElement){document.exitFullscreen();}
   else{document.documentElement.requestFullscreen().catch(()=>{});}});
@@ -1304,7 +1558,10 @@ function applyImport(j){
     if(Array.isArray(j.journal))store.set("journal",j.journal);
     if(Array.isArray(j.customKeys))store.set("customKeys",j.customKeys);
     if(j.layers)for(const k in j.layers)if(LAYERS[k])LAYERS[k].on=!!j.layers[k];
-    applyLayerVisibility();renderBookmarks();renderPresets();}
+    applyLayerVisibility();const APP_VERSION="7.0";
+$("verTag").textContent="v"+APP_VERSION+" · PUBLIC TELEMETRY";
+ledger("Boot","","Sentinel Globe v"+APP_VERSION+" started","OK","OFFICIAL","if the header does not show this version number, your browser is serving a cached copy");
+renderBookmarks();renderPresets();}
   renderLayerList();runAll(true);
   ledger("Vault","","import applied ("+j.type+")","OK","OFFICIAL","validated shape before applying");}
 $("btnSettings").addEventListener("click",()=>{
@@ -1525,21 +1782,45 @@ document.addEventListener("click",e=>{if(e.target.closest("#btnSkyLab"))openSkyL
    generated LIVE from real coastline data so the distortion is visible, not asserted. ---- */
 let AE_WORLD=null;
 async function openAELab(){
-  $("modal").innerHTML=`<h3>◎ Azimuthal-Equidistant Map Lab <button class="ibtn" data-info="views">i</button></h3>
-  <div class="infobody"><canvas id="aeCanvas" width="640" height="640" style="width:100%;background:#04120c;border-radius:10px"></canvas>
-  <div class="sec">This is Earth's real coastline projected from the North Pole outward — the projection used by the UN emblem and by Flat-Earth maps. Distances from the pole are true; everything else distorts, growing extreme toward the south: <b>watch Antarctica smear into a ring around the edge.</b> The cyan dot is the ISS, live. Same planet, same data as the globe — only the mathematics of flattening changed.</div>
-  <div class="sec finer">Great teaching question for the kids: if this map were literally true, Antarctica would be an ice wall longer than Earth's equator, and a flight from Australia to Chile would be impossibly long — yet airlines fly it daily in ~14 hours. The projection is useful; taking it literally isn't.</div>
+  $("modal").innerHTML=`<h3>◎ Flat Map — Polar Projection <button class="ibtn" data-info="views">i</button></h3>
+  <div class="infobody"><canvas id="aeCanvas" width="760" height="760" style="width:100%;background:#04120c;border-radius:10px;cursor:grab;touch-action:none"></canvas>
+  <div class="finer" id="aeCoord" style="margin:2px 0">scroll = zoom · drag = spin · hover = coordinates</div>
+  <div class="row" style="flex-wrap:wrap;gap:4px">
+    <label class="satrow"><input type="checkbox" id="aeQ" checked> quakes</label>
+    <label class="satrow"><input type="checkbox" id="aeF" checked> fires</label>
+    <label class="satrow"><input type="checkbox" id="aeB" checked> grid BAs</label>
+    <label class="satrow"><input type="checkbox" id="aeI" checked> ISS + track</label>
+  </div>
+  <div class="sec">The north-polar flat map: real coastlines with the North Pole at center and Antarctica along the outer rim, the same layout used by the UN emblem and the Flat Earth Society's azimuthal map. Distances measured from the center are true to scale. Live data draws directly on it — quakes, fires, grid regions, and the ISS with its track.</div>
   <div class="row"><button class="hbtn" onclick="document.getElementById('modalBack').classList.remove('open')">CLOSE</button></div></div>`;
   $("modalBack").classList.add("open");
   try{
     if(!AE_WORLD){const r=await fetch("world.geojson");if(!r.ok)throw new Error("world.geojson missing from repo");AE_WORLD=await r.json();
       ledger("AE Lab","","coastlines loaded (Natural Earth, public domain, vendored)","OK","OFFICIAL","");}
-    drawAE();const iv=setInterval(()=>{if(!document.getElementById("aeCanvas")){clearInterval(iv);return;}drawAE();},5000);
+    aeR=340;aeRot=0;drawAE();
+    const cv=document.getElementById("aeCanvas");
+    cv.addEventListener("wheel",e=>{e.preventDefault();aeR=Math.max(120,Math.min(2600,aeR*(e.deltaY<0?1.15:0.87)));drawAE();},{passive:false});
+    let dragging=false,dx0=0,rot0=0;
+    cv.addEventListener("pointerdown",e=>{dragging=true;dx0=e.clientX;rot0=aeRot;cv.setPointerCapture(e.pointerId);cv.style.cursor="grabbing";});
+    cv.addEventListener("pointermove",e=>{
+      const rect=cv.getBoundingClientRect(),sx=cv.width/rect.width;
+      if(dragging){aeRot=rot0+(e.clientX-dx0)*0.4;drawAE();}
+      const p=aeInverse((e.clientX-rect.left)*sx,(e.clientY-rect.top)*sx,cv.width/2,cv.height/2,aeR);
+      document.getElementById("aeCoord").textContent=p?p.lat.toFixed(2)+", "+p.lon.toFixed(2)+"   ·   scroll = zoom · drag = spin":"scroll = zoom · drag = spin · hover = coordinates";});
+    cv.addEventListener("pointerup",()=>{dragging=false;cv.style.cursor="grab";});
+    ["aeQ","aeF","aeB","aeI"].forEach(id=>document.getElementById(id).addEventListener("change",drawAE));
+    const iv=setInterval(()=>{if(!document.getElementById("aeCanvas")){clearInterval(iv);return;}drawAE();},5000);
   }catch(e){ledger("AE Lab","",e.message,"FAIL","UNAVAILABLE","upload world.geojson to the repo");}}
-function aeXY(lat,lon,cx,cy,R){const r=(90-lat)/180*R,t=lon*Math.PI/180;return[cx+r*Math.sin(t),cy-r*Math.cos(t)];}
+let aeR=300,aeRot=0; // interactive state: zoom + rotation
+function aeXY(lat,lon,cx,cy,R){const r=(90-lat)/180*R,t=(lon+aeRot)*Math.PI/180;return[cx+r*Math.sin(t),cy-r*Math.cos(t)];}
+function aeInverse(x,y,cx,cy,R){const dx=x-cx,dy=y-cy,r=Math.hypot(dx,dy);
+  if(r>R*1.02)return null;
+  const lat=90-r/R*180;let lon=Math.atan2(dx,-dy)*180/Math.PI-aeRot;
+  lon=((lon+540)%360)-180;return{lat,lon};}
 function drawAE(){
   const cv=document.getElementById("aeCanvas");if(!cv)return;const g=cv.getContext("2d");
-  const cx=320,cy=320,R=300;g.clearRect(0,0,640,640);
+  const cx=cv.width/2,cy=cv.height/2,R=aeR;g.clearRect(0,0,cv.width,cv.height);
+  g.save();g.beginPath();g.arc(cx,cy,Math.min(cx,cy)-4,0,7);g.clip();
   g.strokeStyle="#1d3a2f";g.lineWidth=1;
   for(let la=60;la>=-90;la-=30){g.beginPath();g.arc(cx,cy,(90-la)/180*R,0,7);g.stroke();} // latitude rings
   for(let lo=0;lo<360;lo+=30){const[a,b]=aeXY(-90,lo,cx,cy,R);g.beginPath();g.moveTo(cx,cy);g.lineTo(a,b);g.stroke();}
@@ -1550,12 +1831,26 @@ function drawAE(){
     else if(G.type==="MultiPolygon")G.coordinates.forEach(p=>p.forEach(draw));
     else if(G.type==="LineString")draw(G.coordinates);
     else if(G.type==="MultiLineString")G.coordinates.forEach(draw);}
-  // home + live ISS
+  // live data overlays — the SAME state the main map renders
+  const ck=id=>{const el=document.getElementById(id);return !el||el.checked;};
+  if(ck("aeQ"))S.quakes.forEach(q=>{const[x,y]=aeXY(q.lat,q.lon,cx,cy,R);
+    g.fillStyle="#d9455b";g.beginPath();g.arc(x,y,Math.max(2,(q.mag||3)-1.5),0,7);g.fill();});
+  if(ck("aeF"))S.fires.forEach(f=>{const[x,y]=aeXY(f.lat,f.lon,cx,cy,R);
+    g.fillStyle="#e07a4b";g.fillRect(x-1.6,y-1.6,3.2,3.2);});
+  if(ck("aeB"))Object.values(S.ba).forEach(b=>{if(!b.lon)return;const[x,y]=aeXY(b.lat,b.lon,cx,cy,R);
+    const s=b.df?b.d/b.df:1;g.fillStyle=s>1.04?"#d9455b":s>0.99?"#e0b24b":"#5fbf9f";
+    g.beginPath();g.arc(x,y,3,0,7);g.fill();});
+  if(ck("aeI")){
+    g.strokeStyle="#7fd4ff";g.setLineDash([4,4]);
+    S.issTrack.forEach(seg=>{g.beginPath();seg.forEach((p,i)=>{const[x,y]=aeXY(p[1],p[0],cx,cy,R);i?g.lineTo(x,y):g.moveTo(x,y);});g.stroke();});
+    g.setLineDash([]);
+    if(S.iss){const[ix,iy]=aeXY(S.iss.lat,S.iss.lon,cx,cy,R);
+      g.fillStyle="#7fd4ff";g.beginPath();g.arc(ix,iy,5,0,7);g.fill();g.fillText("ISS (live)",ix+7,iy);}}
   const[hx,hy]=aeXY(cfg.home.lat,cfg.home.lon,cx,cy,R);
   g.fillStyle="#e0b24b";g.beginPath();g.arc(hx,hy,4,0,7);g.fill();g.fillText("home",hx+6,hy);
-  if(S.iss){const[ix,iy]=aeXY(S.iss.lat,S.iss.lon,cx,cy,R);
-    g.fillStyle="#7fd4ff";g.beginPath();g.arc(ix,iy,5,0,7);g.fill();g.fillStyle="#7fd4ff";g.fillText("ISS (live)",ix+7,iy);}
-  g.fillStyle="#6b8078";g.font="10px sans-serif";g.fillText("Azimuthal equidistant, north polar aspect — Natural Earth coastlines",10,630);}
+  g.restore();
+  g.fillStyle="#6b8078";g.font="10px sans-serif";
+  g.fillText("North-polar azimuthal equidistant · Natural Earth coastlines · live data",10,cv.height-8);}
 document.addEventListener("click",e=>{if(e.target.closest("#btnAELab"))openAELab();});
 
 /* ---- boot: bookmarks, presets, startup profile ---- */
