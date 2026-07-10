@@ -746,8 +746,9 @@ map.on("click",e=>{if(e&&e.originalEvent)lastInteract=now()+12000;}); // clickin
 ["dragend","zoomend","rotateend","pitchend"].forEach(ev=>map.on(ev,e=>{if(e&&e.originalEvent){userBusy=false;lastInteract=now();}}));
 function ambientTick(){
   if(!S.ambient){ambientRAF=null;return;}
-  if(!userBusy&&!map.isMoving()&&now()-lastInteract>2500&&!document.hidden){
-    const c=map.getCenter();map.setCenter([c.lng+0.045*(cfg.orbitSpeed||1),c.lat*0.999]); } // resumes 2.5 s after you let go; speed slider in Views
+  if(aeOpen){if(now()-lastInteract>2500&&!document.hidden){aeRot=(aeRot+0.05*(cfg.orbitSpeed||1))%360;aeScheduleDraw();}} // polar: orbit spins the projection, and your hand still wins
+  else if(!userBusy&&!map.isMoving()&&now()-lastInteract>2500&&!document.hidden){
+    const c=map.getCenter();map.setCenter([c.lng+0.045*(cfg.orbitSpeed||1),c.lat*0.999]); }
   ambientRAF=requestAnimationFrame(ambientTick);}
 function setAmbient(on){S.ambient=on;$("btnAmbient").classList.toggle("on",on);
   if(on){if(map.getZoom()>4.2)map.easeTo({zoom:2.6,pitch:0,duration:1800});
@@ -1010,6 +1011,7 @@ setInterval(updateIssTrack,60000);map.on("load",()=>setTimeout(updateIssTrack,30
 /* ---- Follow ISS: camera locks onto the station, propagated smoothly between fixes ---- */
 let followISS=false,followTimer=null;
 function setFollowISS(on){
+  if(on&&aeOpen)setView("globe",{keepCam:true}); // follow needs the tile camera — mode switch is automatic and graceful
   followISS=on;$("btnFollowISS").classList.toggle("on",on);
   clearInterval(followTimer);
   if(on){
@@ -1508,7 +1510,10 @@ function assistant(q){
     const k=Object.keys(LAYERS).find(k=>k.includes(m[1])||LAYERS[k].name.toLowerCase().includes(m[1]));
     if(k){LAYERS[k].on=true;applyLayerVisibility();renderLayerList();return `${LAYERS[k].name} turned on.`;}
     return "No layer by that name.";}
-  if(/zoom.*(home|my location)|take me home/.test(s)){flyPulse(cfg.home.lon,cfg.home.lat,10,"home");return `Centered on ${esc(cfg.home.name)}.`;}
+  if(/zoom.*(home|my location)|take me home|^go home/.test(s)){goTo(cfg.home.lon,cfg.home.lat,10,"home");return `Centered on ${esc(cfg.home.name)} — in whichever view you're using.`;}
+  if(/follow.*iss/.test(s)){setFollowISS(true);return "Locked onto the ISS. Drag the map to release, or say 'stop following'.";}
+  if(/stop follow|release/.test(s)){setFollowISS(false);return "Released.";}
+  if(/return to globe|back to globe|globe view/.test(s)){setView("globe",{keepCam:true});return "Globe view.";}
   if(/what changed|since yesterday/.test(s)){
     const base=store.get("base",[]);if(base.length<2)return "Not enough recorded history yet — the baseline records a snapshot every ~6 hours while the app is open. Ask again after a day of use.";
     const a=base[base.length-1],b0=base.find(x=>Date.parse(a.d)-Date.parse(x.d)>=72e6)||base[0];
@@ -1690,7 +1695,8 @@ $("btnFocus").addEventListener("click",()=>{
    LOCATION + UI WIRES
    ===================================================================== */
 function setLocation(loc,fly=true){S.loc=loc;
-  if(fly)map.flyTo({center:[loc.lon,loc.lat],zoom:loc.z||8.6,duration:2600});
+  if(fly){if(aeOpen)aeGoTo(loc.lat,loc.lon,loc.z||8.6);
+    else map.flyTo({center:[loc.lon,loc.lat],zoom:loc.z||8.6,duration:2600});}
   ledger("Location","",'focused: '+loc.name,"OK","OFFICIAL","");
   runAdapter("alerts",true);runAdapter("meteo",true);runAdapter("firms",true);
   setTimeout(()=>{runAnomalyEngine();renderAll();},1500);}
@@ -1758,7 +1764,7 @@ function applyImport(j){
     if(Array.isArray(j.journal))store.set("journal",j.journal);
     if(Array.isArray(j.customKeys))store.set("customKeys",j.customKeys);
     if(j.layers)for(const k in j.layers)if(LAYERS[k])LAYERS[k].on=!!j.layers[k];
-    applyLayerVisibility();const APP_VERSION="9.0";
+    applyLayerVisibility();const APP_VERSION="9.1";
 $("verTag").textContent="v"+APP_VERSION+" · PUBLIC TELEMETRY";document.title="Sentinel Globe v"+APP_VERSION;
 ledger("Boot","","Sentinel Globe v"+APP_VERSION+" started","OK","OFFICIAL","if the header does not show this version number, your browser is serving a cached copy");
 renderBookmarks();renderPresets();}
@@ -1925,11 +1931,26 @@ setInterval(()=>{if(map.getSource("night"))gj("night");},120000);
 ledger("Sentinel Globe","","v2 started · MapLibre globe · no telemetry","OK","OFFICIAL","3 files, all vendored, auditable");
 renderLayerList();renderTab();watchdogSweep();
 /* ---- Views: globe / polar top-down (azimuthal perspective, honestly derived from the globe) ---- */
-$("btnViewGlobe").addEventListener("click",()=>{try{map.setProjection({type:"globe"});}catch(e){}
-  map.easeTo({center:[cfg.home.lon,30],zoom:2.2,pitch:0,bearing:0,duration:1600});});
-$("btnViewFlat").addEventListener("click",()=>{try{map.setProjection({type:"mercator"});}catch(e){}
-  map.easeTo({center:[0,20],zoom:1.2,pitch:0,bearing:0,duration:1400});
-  ledger("View","","flat world (Mercator) — turn on ISS to watch its ground track draw the classic wave","OK","OFFICIAL","the wave is a straight orbit drawn on a flattened sphere — the projection makes the wave, not the ISS");});
+let viewMode="globe";
+function setView(mode,opts){
+  opts=opts||{};
+  const from=viewMode;viewMode=mode;
+  ["btnViewGlobe","btnViewFlat","btnAELab"].forEach(id=>$(id).classList.remove("on"));
+  if(mode!=="polar"&&aeOpen)closeAEPane(!opts.noSync); // leaving polar: sync map to where you were looking
+  if(mode==="globe"){$("btnViewGlobe").classList.add("on");
+    try{map.setProjection({type:"globe"});}catch(e){}
+    if(!opts.keepCam)map.easeTo({center:opts.center||[cfg.home.lon,30],zoom:opts.zoom||2.2,pitch:0,bearing:0,duration:1400});}
+  if(mode==="flat"){$("btnViewFlat").classList.add("on");
+    try{map.setProjection({type:"mercator"});}catch(e){}
+    if(!opts.keepCam)map.easeTo({center:opts.center||[0,20],zoom:opts.zoom||1.2,pitch:0,bearing:0,duration:1400});}
+  if(mode==="polar"){$("btnAELab").classList.add("on");
+    const mc=map.getCenter(),mz=map.getZoom();
+    openAEPane();
+    if(from!=="polar")aeGoTo(mc.lat,mc.lng,mz); // arrive looking at the same place, matching scale
+  }
+  ledger("View","",`${from} → ${mode}`,"OK","OFFICIAL",mode==="polar"?"same data, polar projection; exit any time with ✕, Esc, or a view button":"");}
+$("btnViewGlobe").addEventListener("click",()=>setView("globe"));
+$("btnViewFlat").addEventListener("click",()=>setView("flat"));
 $("orbitSpeed").addEventListener("input",e=>{cfg.orbitSpeed=+e.target.value;store.set("orbitSpeed",cfg.orbitSpeed);
   $("orbitSpeedV").textContent=cfg.orbitSpeed.toFixed(1).replace(".0","")+"×";});
 /* ---- PERF modes: AUTO → LOW → HIGH ---- */
@@ -2025,104 +2046,163 @@ document.addEventListener("click",e=>{if(e.target.closest("#btnSkyLab"))openSkyL
 
 /* ---- AE Map Lab: the azimuthal-equidistant ("flat earth" / UN emblem) projection,
    generated LIVE from real coastline data so the distortion is visible, not asserted. ---- */
-let AE_WORLD=null,AE_COUNTIES=null;
-/* ---- Flat Polar view: full map-area takeover. Pan, zoom to local scale, live overlays,
-   and a seamless hand-off to street level (all projections converge at local scale). ---- */
-let aeR=340,aeRot=0,aeTx=0,aeTy=0,aeOpen=false,aeDrawTimer=null;
+let AE_WORLD=null,AE_COUNTIES=null,AE_FAULTS=null;
+/* =====================================================================
+   FLAT POLAR VIEW — first-class mode.
+   Unification rules: (1) overlays read the SAME Layers panel state as the globe;
+   (2) every camera command (Home, search, bookmarks, ◎ fly, Follow ISS, ORBIT)
+   routes through goTo()/orbit hooks that know which view is active;
+   (3) drawing is rAF-throttled with offscreen culling — no per-mousemove full redraws;
+   (4) exit is always available: ✕ button, Esc key, or any Views button.
+   ===================================================================== */
+let aeR=340,aeRot=0,aeTx=0,aeTy=0,aeOpen=false,aeDrawTimer=null,aePulse=null,aeResizeFn=null,aeDrawQueued=false;
 function aeXY(lat,lon,cx,cy,R){const r=(90-lat)/180*R,t=(lon+aeRot)*Math.PI/180;
   return[cx+aeTx+r*Math.sin(t),cy+aeTy-r*Math.cos(t)];}
 function aeInverse(x,y,cx,cy,R){const dx=x-cx-aeTx,dy=y-cy-aeTy,r=Math.hypot(dx,dy);
   if(r>R*1.02)return null;
   const lat=90-r/R*180;let lon=Math.atan2(dx,-dy)*180/Math.PI-aeRot;
   lon=((lon+540)%360)-180;return{lat,lon};}
-function aeCenter(){const cv=document.getElementById("aeCanvas");
-  return cv?aeInverse(cv.width/2,cv.height/2,cv.width/2,cv.height/2,aeR):null;}
-async function openAELab(){
+function aeScheduleDraw(){if(aeDrawQueued)return;aeDrawQueued=true;
+  requestAnimationFrame(()=>{aeDrawQueued=false;drawAE();});}
+function aeGoTo(lat,lon,z){ // center the polar view on a point; z ~ tile-zoom equivalence
+  const cv=document.getElementById("aeCanvas");if(!cv)return;
+  aeRot=0;
+  if(z!=null)aeR=Math.max(cv.height*0.35,Math.min(90000,cv.height*0.42*Math.pow(2,z-2.2)));
+  const r=(90-lat)/180*aeR,t=lon*Math.PI/180;
+  aeTx=-r*Math.sin(t);aeTy=r*Math.cos(t);
+  aePulse={lat,lon,until:now()+6000};
+  aeScheduleDraw();}
+/* central camera router — every feature calls this instead of touching the map directly */
+function goTo(lon,lat,z,label){
+  if(aeOpen){aeGoTo(lat,lon,z);}
+  else flyPulseMap(lon,lat,z,label);}
+function openAEPane(){if(!aeOpen)openAELab();}
+function closeAEPane(sync){
+  if(!aeOpen)return;
+  let c=null;const cv=document.getElementById("aeCanvas");
+  if(sync&&cv)c=aeInverse(cv.width/2,cv.height/2,cv.width/2,cv.height/2,aeR);
+  openAELab(); // toggles off + cleans listeners
+  if(c)map.jumpTo({center:[c.lon,c.lat]}); // exit looking at the same place
+}
+function openAELab(){
   aeOpen=!aeOpen;
   let pane=document.getElementById("aePane");
   $("btnAELab").classList.toggle("on",aeOpen);
-  if(!aeOpen){if(pane)pane.remove();clearInterval(aeDrawTimer);return;}
+  if(!aeOpen){
+    if(pane)pane.remove();
+    clearInterval(aeDrawTimer);aeDrawTimer=null;
+    if(aeResizeFn){window.removeEventListener("resize",aeResizeFn);aeResizeFn=null;}
+    setTimeout(()=>map.resize(),50);
+    return;}
   pane=document.createElement("div");pane.id="aePane";
   pane.innerHTML=`<canvas id="aeCanvas"></canvas>
     <div id="aeTop">
       <span id="aeCoord">drag = pan · scroll = zoom</span>
-      <label class="satrow"><input type="checkbox" id="aeQ" checked>quakes</label>
-      <label class="satrow"><input type="checkbox" id="aeF" checked>fires</label>
-      <label class="satrow"><input type="checkbox" id="aeB" checked>grid</label>
-      <label class="satrow"><input type="checkbox" id="aeI" checked>ISS</label>
+      <span class="finer">overlays follow your Layers panel</span>
       <label class="satrow"><input type="checkbox" id="aeC" checked>counties</label>
-      <button class="hbtn" id="aeHome">⌂</button>
-      <button class="hbtn" id="aeClose">✕ close</button>
+      <button class="hbtn" id="aeHome" title="fly to your home watch zone">⌂ Home</button>
+      <button class="hbtn" id="aeClose" title="Esc also exits">✕ Back to globe</button>
     </div>
     <button class="hbtn" id="aeHandoff" style="display:none">Continue to street level here ➜</button>`;
   document.getElementById("mapWrap").appendChild(pane);
   const cv=document.getElementById("aeCanvas");
-  const fit=()=>{cv.width=pane.clientWidth;cv.height=pane.clientHeight;drawAE();};
-  fit();window.addEventListener("resize",fit);
-  try{
-    if(!AE_WORLD){const r=await fetch("world.geojson");if(!r.ok)throw new Error("world.geojson missing from repo");
-      AE_WORLD=await r.json();}
-    if(!AE_COUNTIES)fetch("counties.geojson").then(r=>r.ok?r.json():null).then(j=>{AE_COUNTIES=j;drawAE();}).catch(()=>{});
-  }catch(e){ledger("Flat Polar","",e.message,"FAIL","UNAVAILABLE","upload world.geojson to the repo");}
-  aeR=Math.max(aeR,cv.height*0.42);drawAE();
+  aeResizeFn=()=>{if(!document.getElementById("aeCanvas"))return;
+    cv.width=pane.clientWidth;cv.height=pane.clientHeight;aeScheduleDraw();};
+  aeResizeFn();window.addEventListener("resize",aeResizeFn);
+  if(!AE_WORLD)fetch("world.geojson").then(r=>r.ok?r.json():Promise.reject(new Error("world.geojson missing")))
+    .then(j=>{AE_WORLD=j;aeScheduleDraw();})
+    .catch(e=>ledger("Flat Polar","",e.message,"FAIL","UNAVAILABLE","upload world.geojson to the repo"));
+  if(!AE_COUNTIES)fetch("counties.geojson").then(r=>r.ok?r.json():null).then(j=>{AE_COUNTIES=j;aeScheduleDraw();}).catch(()=>{});
+  if(LAYERS.faults&&LAYERS.faults.on&&!AE_FAULTS)fetch("faults.geojson").then(r=>r.ok?r.json():null).then(j=>{AE_FAULTS=j;aeScheduleDraw();}).catch(()=>{});
+  aeR=Math.max(aeR,cv.height*0.42);aeScheduleDraw();
   cv.addEventListener("wheel",e=>{e.preventDefault();
     const k=e.deltaY<0?1.18:0.85,rect=cv.getBoundingClientRect(),sx=cv.width/rect.width;
     const mx=(e.clientX-rect.left)*sx,my=(e.clientY-rect.top)*sx;
-    // zoom anchored to the cursor
     aeTx=mx-cv.width/2-(mx-cv.width/2-aeTx)*k;aeTy=my-cv.height/2-(my-cv.height/2-aeTy)*k;
-    aeR=Math.max(cv.height*0.35,Math.min(90000,aeR*k));drawAE();},{passive:false});
+    aeR=Math.max(cv.height*0.35,Math.min(90000,aeR*k));lastInteract=now();aeScheduleDraw();},{passive:false});
   let drag=false,px=0,py=0;
-  cv.addEventListener("pointerdown",e=>{drag=true;px=e.clientX;py=e.clientY;cv.setPointerCapture(e.pointerId);});
+  cv.addEventListener("pointerdown",e=>{drag=true;px=e.clientX;py=e.clientY;lastInteract=now();cv.setPointerCapture(e.pointerId);});
   cv.addEventListener("pointermove",e=>{
     const rect=cv.getBoundingClientRect(),sx=cv.width/rect.width;
-    if(drag){aeTx+=(e.clientX-px)*sx;aeTy+=(e.clientY-py)*sx;px=e.clientX;py=e.clientY;drawAE();}
+    if(drag){aeTx+=(e.clientX-px)*sx;aeTy+=(e.clientY-py)*sx;px=e.clientX;py=e.clientY;lastInteract=now();aeScheduleDraw();}
     const p=aeInverse((e.clientX-rect.left)*sx,(e.clientY-rect.top)*sx,cv.width/2,cv.height/2,aeR);
-    document.getElementById("aeCoord").textContent=p?p.lat.toFixed(3)+", "+p.lon.toFixed(3):"drag = pan · scroll = zoom";});
+    const el=document.getElementById("aeCoord");
+    if(el)el.textContent=p?p.lat.toFixed(3)+", "+p.lon.toFixed(3):"drag = pan · scroll = zoom";});
   cv.addEventListener("pointerup",()=>drag=false);
-  document.getElementById("aeClose").addEventListener("click",openAELab);
-  document.getElementById("aeHome").addEventListener("click",()=>{
-    // center the view on home
-    aeRot=0;const r=(90-cfg.home.lat)/180*aeR,t=cfg.home.lon*Math.PI/180;
-    aeTx=-r*Math.sin(t);aeTy=r*Math.cos(t);drawAE();});
-  ["aeQ","aeF","aeB","aeI","aeC"].forEach(id=>document.getElementById(id).addEventListener("change",drawAE));
+  document.getElementById("aeClose").addEventListener("click",()=>setView("globe",{keepCam:true}));
+  document.getElementById("aeHome").addEventListener("click",()=>aeGoTo(cfg.home.lat,cfg.home.lon,8.5));
+  document.getElementById("aeC").addEventListener("change",aeScheduleDraw);
   document.getElementById("aeHandoff").addEventListener("click",()=>{
-    const c=aeCenter();if(c){openAELab();map.flyTo({center:[c.lon,c.lat],zoom:12,duration:1800});}});
-  aeDrawTimer=setInterval(()=>{if(!document.getElementById("aeCanvas")){clearInterval(aeDrawTimer);return;}drawAE();},5000);}
+    const c=aeInverse(cv.width/2,cv.height/2,cv.width/2,cv.height/2,aeR);
+    setView("globe",{noSync:true,keepCam:true});
+    if(c)map.jumpTo({center:[c.lon,c.lat],zoom:12});});
+  aeDrawTimer=setInterval(aeScheduleDraw,5000); // periodic refresh for live data
+}
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&aeOpen)setView("globe",{keepCam:true});});
 function drawAE(){
   const cv=document.getElementById("aeCanvas");if(!cv)return;const g=cv.getContext("2d");
-  const cx=cv.width/2,cy=cv.height/2,R=aeR;g.clearRect(0,0,cv.width,cv.height);
-  g.fillStyle="#04120c";g.fillRect(0,0,cv.width,cv.height);
+  const cx=cv.width/2,cy=cv.height/2,R=aeR,W=cv.width,H=cv.height,M=60;
+  const vis=(x,y)=>x>-M&&x<W+M&&y>-M&&y<H+M;
+  g.fillStyle="#04120c";g.fillRect(0,0,W,H);
   g.strokeStyle="#1d3a2f";g.lineWidth=1;
   for(let la=60;la>=-90;la-=30){g.beginPath();g.arc(cx+aeTx,cy+aeTy,(90-la)/180*R,0,7);g.stroke();}
   for(let lo=0;lo<360;lo+=30){const[a,b]=aeXY(-90,lo,cx,cy,R);g.beginPath();g.moveTo(cx+aeTx,cy+aeTy);g.lineTo(a,b);g.stroke();}
-  const draw=cs=>{g.beginPath();cs.forEach((p,i)=>{const[x,y]=aeXY(p[1],p[0],cx,cy,R);i?g.lineTo(x,y):g.moveTo(x,y);});g.stroke();};
-  const drawFC=(fc)=>{for(const f of fc.features){const G=f.geometry;
+  const draw=cs=>{const[fx,fy]=aeXY(cs[0][1],cs[0][0],cx,cy,R);
+    let any=vis(fx,fy);
+    if(!any){for(let i=Math.floor(cs.length/2);i<cs.length;i+=Math.max(1,cs.length>>2)){const[x,y]=aeXY(cs[i][1],cs[i][0],cx,cy,R);if(vis(x,y)){any=true;break;}}}
+    if(!any)return; // offscreen culling — the freeze fix
+    g.beginPath();g.moveTo(fx,fy);
+    for(let i=1;i<cs.length;i++){const[x,y]=aeXY(cs[i][1],cs[i][0],cx,cy,R);g.lineTo(x,y);}g.stroke();};
+  const drawFC=fc=>{for(const f of fc.features){const G=f.geometry;
     if(G.type==="Polygon")G.coordinates.forEach(draw);
     else if(G.type==="MultiPolygon")G.coordinates.forEach(p=>p.forEach(draw));
     else if(G.type==="LineString")draw(G.coordinates);
     else if(G.type==="MultiLineString")G.coordinates.forEach(draw);}};
   g.strokeStyle="#5fbf9f";g.lineWidth=1.2;if(AE_WORLD)drawFC(AE_WORLD);
-  const ck=id=>{const el=document.getElementById(id);return !el||el.checked;};
-  if(AE_COUNTIES&&ck("aeC")&&aeR>1200){g.strokeStyle="#2f5546";g.lineWidth=0.7;drawFC(AE_COUNTIES);}
-  if(ck("aeQ"))S.quakes.forEach(q=>{const[x,y]=aeXY(q.lat,q.lon,cx,cy,R);
+  const cOn=document.getElementById("aeC");
+  if(AE_COUNTIES&&(!cOn||cOn.checked)&&R>1200){g.strokeStyle="#2f5546";g.lineWidth=0.7;drawFC(AE_COUNTIES);}
+  /* overlays follow the main Layers panel — one state, two renderers */
+  if(LAYERS.faults&&LAYERS.faults.on){
+    if(!AE_FAULTS)fetch("faults.geojson").then(r=>r.ok?r.json():null).then(j=>{AE_FAULTS=j;aeScheduleDraw();}).catch(()=>{});
+    else if(R>700){g.strokeStyle="#d9455b";g.lineWidth=0.8;drawFC(AE_FAULTS);}}
+  if(LAYERS.quakes&&LAYERS.quakes.on)S.quakes.forEach(q=>{const[x,y]=aeXY(q.lat,q.lon,cx,cy,R);if(!vis(x,y))return;
     g.strokeStyle="#ff5a6e";g.lineWidth=2;g.beginPath();g.arc(x,y,Math.max(3,(q.mag||3)),0,7);g.stroke();});
-  if(ck("aeF"))S.fires.forEach(f=>{const[x,y]=aeXY(f.lat,f.lon,cx,cy,R);
+  if(LAYERS.fires&&LAYERS.fires.on)S.fires.forEach(f=>{const[x,y]=aeXY(f.lat,f.lon,cx,cy,R);if(!vis(x,y))return;
     g.fillStyle="#e07a4b";g.fillRect(x-2,y-2,4,4);});
-  if(ck("aeB"))Object.values(S.ba).forEach(b=>{if(!b.lon)return;const[x,y]=aeXY(b.lat,b.lon,cx,cy,R);
+  if(LAYERS.alerts&&LAYERS.alerts.on)alertPoints().forEach(a=>{const[x,y]=aeXY(a.lat,a.lon,cx,cy,R);if(!vis(x,y))return;
+    g.fillStyle="#e0b24b";g.beginPath();g.moveTo(x,y-5);g.lineTo(x+5,y+4);g.lineTo(x-5,y+4);g.closePath();g.fill();});
+  if(LAYERS.ba&&LAYERS.ba.on)Object.values(S.ba).forEach(b=>{if(!b.lon)return;const[x,y]=aeXY(b.lat,b.lon,cx,cy,R);if(!vis(x,y))return;
     const s=b.df?b.d/b.df:1;g.fillStyle=s>1.04?"#d9455b":s>0.99?"#e0b24b":"#5fbf9f";
     g.beginPath();g.arc(x,y,4,0,7);g.fill();});
-  if(ck("aeI")){g.strokeStyle="#7fd4ff";g.setLineDash([4,4]);g.lineWidth=1.4;
-    S.issTrack.forEach(seg=>{g.beginPath();seg.forEach((p,i)=>{const[x,y]=aeXY(p[1],p[0],cx,cy,R);i?g.lineTo(x,y):g.moveTo(x,y);});g.stroke();});
+  if(LAYERS.flow&&LAYERS.flow.on)S.flows.forEach(f=>{const[x1,y1]=aeXY(f.a.lat,f.a.lon,cx,cy,R),[x2,y2]=aeXY(f.b.lat,f.b.lon,cx,cy,R);
+    if(!vis(x1,y1)&&!vis(x2,y2))return;
+    g.strokeStyle="#7fe0bd";g.lineWidth=Math.min(4,1+f.mw/2500);g.globalAlpha=0.6;
+    g.beginPath();g.moveTo(x1,y1);g.lineTo(x2,y2);g.stroke();g.globalAlpha=1;});
+  if(LAYERS.ships&&LAYERS.ships.on)Object.values(S.ships).forEach(v=>{const[x,y]=aeXY(v.lat,v.lon,cx,cy,R);if(!vis(x,y))return;
+    g.fillStyle="#5bb8d9";g.beginPath();g.arc(x,y,2.5,0,7);g.fill();});
+  if(LAYERS.aircraft&&LAYERS.aircraft.on)S.aircraft.forEach(a=>{const[x,y]=aeXY(a.lat,a.lon,cx,cy,R);if(!vis(x,y))return;
+    g.fillStyle="#c9d8d2";g.beginPath();g.arc(x,y,2.5,0,7);g.fill();});
+  if(LAYERS.sats&&LAYERS.sats.on)S.sats.forEach(sp=>{const[x,y]=aeXY(sp.lat,sp.lon,cx,cy,R);if(!vis(x,y))return;
+    g.fillStyle="#c9b8ff";g.beginPath();g.arc(x,y,2,0,7);g.fill();});
+  if(LAYERS.iss&&LAYERS.iss.on){g.strokeStyle="#7fd4ff";g.setLineDash([4,4]);g.lineWidth=1.4;
+    S.issTrack.forEach(seg=>{g.beginPath();let started=false;
+      seg.forEach(p=>{const[x,y]=aeXY(p[1],p[0],cx,cy,R);started?g.lineTo(x,y):(g.moveTo(x,y),started=true);});g.stroke();});
     g.setLineDash([]);
     if(S.iss){const[ix,iy]=aeXY(S.iss.lat,S.iss.lon,cx,cy,R);
-      g.fillStyle="#7fd4ff";g.beginPath();g.arc(ix,iy,5,0,7);g.fill();g.fillText("ISS",ix+7,iy);}}
+      g.fillStyle="#7fd4ff";g.beginPath();g.arc(ix,iy,5,0,7);g.fill();g.font="11px sans-serif";g.fillText("ISS",ix+7,iy);}}
   const[hx,hy]=aeXY(cfg.home.lat,cfg.home.lon,cx,cy,R);
-  g.fillStyle="#e0b24b";g.beginPath();g.arc(hx,hy,4,0,7);g.fill();g.font="11px sans-serif";g.fillText("home",hx+6,hy);
+  if(vis(hx,hy)){g.fillStyle="#e0b24b";g.beginPath();g.arc(hx,hy,4,0,7);g.fill();g.font="11px sans-serif";g.fillText("home",hx+6,hy);}
+  if(aePulse&&now()<aePulse.until){const[qx,qy]=aeXY(aePulse.lat,aePulse.lon,cx,cy,R);
+    const ph=(now()%1200)/1200;
+    g.strokeStyle="#ff7ac2";g.lineWidth=2.5;g.globalAlpha=1-ph;
+    g.beginPath();g.arc(qx,qy,8+30*ph,0,7);g.stroke();g.globalAlpha=1;
+    setTimeout(aeScheduleDraw,80);}
   g.fillStyle="#6b8078";g.font="10px sans-serif";
-  g.fillText("North-polar azimuthal equidistant · Natural Earth · US Census · live data",8,cv.height-6);
+  g.fillText("North-polar azimuthal equidistant · Natural Earth · US Census · live data",8,H-6);
   const ho=document.getElementById("aeHandoff");
-  if(ho)ho.style.display=aeR>22000?"block":"none";}
-document.addEventListener("click",e=>{if(e.target.closest("#btnAELab"))openAELab();});
+  if(ho)ho.style.display=R>22000?"block":"none";}
+document.addEventListener("click",e=>{if(e.target.closest("#btnAELab")){
+  aeOpen?setView("globe",{keepCam:true}):setView("polar");}});
 
 /* ---- boot: bookmarks, presets, startup profile ---- */
 renderBookmarks();renderPresets();
