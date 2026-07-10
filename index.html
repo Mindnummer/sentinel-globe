@@ -56,6 +56,11 @@ h2:first-child{margin-top:0}
 #coordChip{position:absolute;left:8px;bottom:6px;z-index:26;font-size:10.5px;color:#9fb8ae;
   background:#04120ccc;border:1px solid #163026;border-radius:8px;padding:2px 8px;cursor:pointer;user-select:none}
 #coordChip:hover{color:#7fe0bd}
+#altChip{position:absolute;left:8px;bottom:26px;z-index:26;font-size:10.5px;color:#9fb8ae;
+  background:#04120ccc;border:1px solid #163026;border-radius:8px;padding:2px 8px;user-select:none}
+#streetBtn{position:absolute;left:50%;transform:translateX(-50%);bottom:10px;z-index:27;display:none}
+#enrichChip{position:absolute;right:8px;bottom:26px;z-index:26;font-size:10.5px;color:#7fe0bd;
+  background:#04120ccc;border:1px solid #163026;border-radius:8px;padding:2px 8px;display:none}
 #aePane{position:absolute;inset:0;z-index:40;background:#04120c}
 #aePane canvas{width:100%;height:100%;display:block;cursor:grab;touch-action:none}
 #aeTop{position:absolute;top:6px;left:8px;right:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;
@@ -296,6 +301,7 @@ body.focus #mobileNav{display:none!important}
     <div class="tab" data-tab="watchdog">WATCHDOG <button class="ibtn" data-info="watchdog">i</button></div>
     <div class="tab" data-tab="sources">SOURCES <button class="ibtn" data-info="sources">i</button></div>
     <div class="tab" data-tab="anomalies">ANOMALIES <button class="ibtn" data-info="anom">i</button></div>
+    <div class="tab" data-tab="assist">ASSIST <button class="ibtn" data-info="assist">i</button></div>
     <div class="tab" data-tab="registry">REGISTRY <button class="ibtn" data-info="registry">i</button></div>
     <div class="tab" data-tab="journal">JOURNAL <button class="ibtn" data-info="journal">i</button></div>
   </div>
@@ -320,6 +326,8 @@ const store={get:(k,d)=>{try{const v=localStorage.getItem("sg2_"+k);return v==nu
 const cfg={
   firmsKey:store.get("firmsKey",""), eiaKey:store.get("eiaKey",""), nasaKey:store.get("nasaKey","DEMO_KEY"),
   tomtomKey:store.get("tomtomKey",""), aisKey:store.get("aisKey",""),
+  showAlt:store.get("showAlt",true), enrich:store.get("enrich",true),
+  autoStreet:store.get("autoStreet",true), clutter:store.get("clutter",true),
   home:store.get("home",{name:"Decatur, TX 76234 (default — change in ⚙)",lat:33.2343,lon:-97.5861}),
 };
 const S={loc:cfg.home, mock:false, integrity:false, ambient:false,
@@ -394,6 +402,7 @@ journal:{t:"User Journal (Tier 7)",w:"Your own observations — sleep, mood, hea
 imf:{t:"IMF Bz / Bt",w:"The interplanetary magnetic field carried by the solar wind, measured at the DSCOVR spacecraft. Bt = total strength; Bz = the north-south component. When Bz points SOUTH (negative) for hours, it links up with Earth's field and lets solar-wind energy pour in — that is the main switch for geomagnetic storms. Northward Bz mostly deflects the flow.",s:"NOAA SWPC / DSCOVR at L1",f:"~1-min data, fetched every 5 min",c:"MEASURED",l:"L1 is 15–60 min upstream of Earth depending on wind speed. A single negative spike means little; duration is what matters."},
 anom:{t:"Anomalies & SITREP",w:"Every pattern the engine flags across ALL feeds, led by a one-paragraph SITREP: posture (QUIET / ADVISORY / WATCH / ELEVATED), finding count, and the leading items. Cards marked ◎ are clickable — the map flies there and pulses the spot. Cross-layer rules now include: systemic multi-region grid stress, geomagnetic activity coinciding with grid stress, flare-then-storm sequences, and feeds going dark during an active severe event.",s:"Rule engine over every live feed + your recorded baseline",f:"Every refresh cycle",c:"Per finding — printed on each card",l:"Findings are pattern detections with stated uncertainty, never predictions. The briefing discipline is the point: source, confidence, and what would raise it, before any reaction."},
 follow:{t:"Follow ISS",w:"Locks the camera onto the International Space Station as it orbits at ~27,600 km/h — one lap of Earth every ~92 minutes. Between the live fixes (about once a minute) the position is propagated with SGP4 so the ride is smooth, and its dashed ground track shows where it is headed. Drag the map and the follow releases instantly — your hand always beats the autopilot. Turning this on turns ORBIT rotation off, since both want the camera.",s:"WhereTheISS fixes + CelesTrak orbit, SGP4-propagated",f:"Camera updates every 2 s",c:"MODELED position from MEASURED orbit — km-scale accuracy",l:"Best experienced on the Globe view zoomed to 3–4. On the Flat World view the camera will jump at the date line — that is the flattening, not the station."},
+assist:{t:"Sentinel Assistant",w:"A command console over the live state. It reads the current view, layers, and feeds, controls the interface on request, and answers with counts and sources. It is deterministic — a parser, not an AI guessing: if it doesn't know, it says so, and it never invents causes.",s:"Your own live feed state",f:"Instant",c:"Reports carry the confidence of their underlying feeds",l:"Understands the listed commands, not open conversation. It cannot see anything the feeds have not fetched."},
 feeds:{t:"Feed Status Bar",w:"Live state of every data source. Spinning ring = fetching now. Green dot + age = loaded, showing how old the data is. Red ✕ = last attempt failed. Gray — = off (layer disabled or key missing). Click any chip for details: the exact error, how often it polls, a ↻ Retry button, a link to view the SAME data at the official source website, and honest alternatives for feeds that fail often.",s:"Internal instrumentation of every adapter",f:"Updates the instant any fetch starts or finishes",c:"—",l:"Shows fetch health only — it cannot detect a source returning wrong-but-well-formed data (the Watchdog cross-checks handle that)."},
 faults:{t:"Fault Lines (global)",w:"13,696 mapped active faults worldwide, drawn in red. Click any fault for its name and slip type. A fault on the map means geologists have documented movement there in the geologically recent past — it is NOT a prediction that it will move soon.",s:"GEM Global Active Faults Database (research compilation, CC-BY-SA), vendored in this repo",f:"Static research dataset",c:"MEASURED",l:"Compiled from regional catalogs of varying quality; some regions are mapped in far more detail than others. Simplified to ~1 km precision for speed. Absence of a drawn fault does not mean absence of a fault."},
 flow:{t:"Power Flow Between BAs",w:"Animated lines showing electricity interchange between balancing authorities — which regions are exporting power (line flows away) and which are importing. Line thickness = megawatts. Moving dashes show direction. This is how you SEE the relationships between grid operators: ERCOT is nearly an island; the Eastern and Western interconnections trade constantly.",s:"EIA-930 interchange data (needs your free EIA key)",f:"Hourly, 1–2 h publication lag",c:"MEASURED values, MODELED line positions (region centroids)",l:"The animation represents direction, not literal electron speed. Flows under 25 MW are hidden as noise. Intra-BA flows are not public."},
@@ -636,8 +645,12 @@ map.on("load",()=>{
   applyLayerVisibility();
   // click popups with honest per-feature detail
   const pop=(html,ll)=>new maplibregl.Popup({closeButton:true,maxWidth:"320px"}).setLngLat(ll).setHTML(html).addTo(map);
-  map.on("click","quakes",e=>{const p=e.features[0].properties;
-    pop(`<b>M${(+p.mag).toFixed(1)}</b> ${esc(p.place)}<br>depth ${p.depth} km · ${fmtAge(+p.t)} ago<br><span style="color:#8fa69e">USGS · MEASURED${p.mock==="true"||p.mock===true?" · <b>MOCK</b>":""}</span>`,e.lngLat);});
+  map.on("click","quakes",e=>{const p=e.features[0].properties,c=e.features[0].geometry.coordinates;
+    pulseAt(c[0],c[1],"M"+(+p.mag).toFixed(1)); // highlight in place — no camera move
+    const dKm=haversine(map.getCenter().lat,map.getCenter().lng,c[1],c[0]);
+    pop(`<b>M${(+p.mag).toFixed(1)}</b> ${esc(p.place)}<br>depth ${p.depth} km · ${fmtAge(+p.t)} ago<br>${Math.round(dKm*0.621)} mi from view center
+    <br><button class="hbtn" data-fly="${c[0]},${c[1]},8" style="margin-top:3px">◎ Center on this quake</button>
+    <br><span style="color:#8fa69e">USGS · MEASURED${p.mock==="true"||p.mock===true?" · <b>MOCK</b>":""}</span>`,e.lngLat);});
   map.on("click","fires",e=>{const p=e.features[0].properties;
     pop(`<b>Thermal detection</b><br>${esc(p.when)} UTC · sat ${esc(p.sat)}<br>FIRMS confidence: ${esc(p.conf)}<br><span style="color:#8fa69e">NASA FIRMS · detection ≠ confirmed fire${p.mock==="true"||p.mock===true?" · <b>MOCK</b>":""}</span>`,e.lngLat);});
   map.on("click","aircraft",async e=>{const p=e.features[0].properties;
@@ -729,6 +742,7 @@ function radarPlay(on){
 let ambientRAF=null,lastInteract=0,userBusy=false;
 // FIX: track interaction END, not just start — trackpad inertia used to re-arm the pause forever.
 ["dragstart","zoomstart","rotatestart","pitchstart"].forEach(ev=>map.on(ev,e=>{if(e&&e.originalEvent){userBusy=true;lastInteract=now();}}));
+map.on("click",e=>{if(e&&e.originalEvent)lastInteract=now()+12000;}); // clicking a marker holds ORBIT still for ~15 s — the world must not drift away from what you just selected
 ["dragend","zoomend","rotateend","pitchend"].forEach(ev=>map.on(ev,e=>{if(e&&e.originalEvent){userBusy=false;lastInteract=now();}}));
 function ambientTick(){
   if(!S.ambient){ambientRAF=null;return;}
@@ -882,6 +896,35 @@ function rebuildSats(){
       out.push({name:s.name,grp:g,lat:satellite.degreesLat(gd.latitude),lon:satellite.degreesLong(gd.longitude),alt:gd.height});}catch(e){}}
   S.sats=out;gj("sats");}
 
+/* ---- Local telemetry enrichment: study a region for 30 s and the app digs deeper ---- */
+const enrichChip=document.createElement("div");enrichChip.id="enrichChip";
+document.getElementById("mapWrap").appendChild(enrichChip);
+let dwellTimer=null;const enrichedCells=new Set();
+map.on("moveend",()=>{clearTimeout(dwellTimer);
+  if(cfg.enrich===false)return;
+  if(map.getZoom()<5.5)return;
+  dwellTimer=setTimeout(enrichRegion,30000);});
+async function enrichRegion(){
+  const b=map.getBounds(),c=map.getCenter();
+  const cell=Math.round(c.lat)+","+Math.round(c.lng)+","+Math.round(map.getZoom());
+  if(enrichedCells.has(cell))return; // cached this session — returning is instant
+  enrichedCells.add(cell);
+  enrichChip.style.display="block";enrichChip.textContent="Enhancing regional data…";
+  let added=0;
+  try{ // 30-day regional quake history for the viewport (deeper than the global day feed)
+    const r=await fetch(`https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=${new Date(now()-30*864e5).toISOString().slice(0,10)}&minlatitude=${b.getSouth().toFixed(2)}&maxlatitude=${b.getNorth().toFixed(2)}&minlongitude=${b.getWest().toFixed(2)}&maxlongitude=${b.getEast().toFixed(2)}&minmagnitude=1.5&limit=400`);
+    if(r.ok){const j=await r.json();const seen=new Set(S.quakes.map(q=>q.id));
+      for(const f of j.features){if(seen.has(f.id))continue;
+        S.quakes.push({id:f.id,mag:f.properties.mag,place:f.properties.place,depth:f.geometry.coordinates[2],
+          lon:f.geometry.coordinates[0],lat:f.geometry.coordinates[1],t:f.properties.time});added+=1;}
+      gj("quakes");
+      ledger("USGS regional (enrichment)","earthquake.usgs.gov",`${added} additional 30-day quakes for this viewport`,"OK","MEASURED","dwell-triggered deep pull; cached this session");}
+  }catch(e){}
+  try{ if(map.getZoom()>=8&&(!S.power||!S.power.features.length)){await scanPower();added+=1;} }catch(e){}
+  try{ await runAdapter("opensky",true); }catch(e){}
+  enrichChip.textContent=added?`Regional data enhanced ✓`:`No additional telemetry available for this region — that is a coverage fact, not a malfunction`;
+  setTimeout(()=>{enrichChip.style.display="none";},added?2500:5000);}
+
 /* ---- Highlight pulse: click any BA/alert/anomaly and the map shows you WHERE ---- */
 let hlTimer=null,hlPhase=0;
 function pulseAt(lon,lat,label){
@@ -908,7 +951,34 @@ function pulseLayer(k){
       src.features.forEach(f=>scan(f.geometry.coordinates));
       if(minX<=maxX)map.fitBounds([[minX,minY],[maxX,maxY]],{padding:80,maxZoom:9,duration:1600});}}catch(e){}}
 document.addEventListener("click",e=>{const l=e.target.closest("[data-locate]");if(l){e.stopPropagation();pulseLayer(l.dataset.locate);}});
+document.addEventListener("click",e=>{const c=e.target.closest("[data-cluster]");if(c)centerAlertCluster(+c.dataset.cluster);});
 function flyPulse(lon,lat,z,label){map.flyTo({center:[lon,lat],zoom:z||5.2,duration:1800});pulseAt(lon,lat,label);}
+function pulseMany(pts){ // pulse a whole cluster at once
+  if(!map.getSource("hl")||!pts.length)return;
+  map.getSource("hl").setData({type:"FeatureCollection",features:pts.map(p=>({type:"Feature",
+    geometry:{type:"Point",coordinates:[p.lon,p.lat]},properties:{}}))});
+  clearInterval(hlTimer);hlPhase=0;
+  hlTimer=setInterval(()=>{hlPhase++;
+    try{map.setPaintProperty("hl","circle-radius",14+12*Math.abs(Math.sin(hlPhase/4)));
+        map.setPaintProperty("hl","circle-stroke-opacity",0.35+0.6*Math.abs(Math.cos(hlPhase/4)));}catch(e){}
+    if(hlPhase>110){clearInterval(hlTimer);map.getSource("hl").setData({type:"FeatureCollection",features:[]});}},90);}
+function alertPoints(){ // centroid per alert (polygon mean or home for local no-geom)
+  const pts=[];for(const a of S.alerts){if(a.mock)continue;
+    if(a.geom&&a.geom.coordinates){try{const c=a.geom.type==="Polygon"?a.geom.coordinates[0]:a.geom.coordinates[0][0];
+      pts.push({lon:c.reduce((s,p)=>s+p[0],0)/c.length,lat:c.reduce((s,p)=>s+p[1],0)/c.length,ev:a.event});}catch(e){}}
+    else if(a.local)pts.push({lon:cfg.home.lon,lat:cfg.home.lat,ev:a.event});}
+  return pts;}
+function alertClusters(){ // greedy clustering: alerts within ~500 km join a cluster
+  const pts=alertPoints(),cl=[];
+  for(const p of pts){const c=cl.find(c=>haversine(p.lat,p.lon,c.lat,c.lon)<500);
+    if(c){c.pts.push(p);c.lat=c.pts.reduce((s,x)=>s+x.lat,0)/c.pts.length;c.lon=c.pts.reduce((s,x)=>s+x.lon,0)/c.pts.length;}
+    else cl.push({lat:p.lat,lon:p.lon,pts:[p]});}
+  return cl.sort((a,b)=>b.pts.length-a.pts.length);}
+function centerAlertCluster(i){const cl=alertClusters();if(!cl.length)return;
+  const c=cl[Math.min(i||0,cl.length-1)];
+  map.flyTo({center:[c.lon,c.lat],zoom:cl.length>1&&c.pts.length<3?6:5.2,duration:1900});
+  pulseMany(c.pts);
+  ledger("Alert cluster","",`centered cluster of ${c.pts.length} alert(s)`,"OK","OFFICIAL","centroid = mean of alert-polygon centers");}
 document.addEventListener("click",e=>{
   const b=e.target.closest("[data-bafly]");if(b){const c=BA_CENTROIDS[b.dataset.bafly];
     if(c)flyPulse(c.lon,c.lat,5.4,b.dataset.bafly);return;}
@@ -1410,6 +1480,46 @@ function drawWxSpark(){
   g.fillText(Math.round(max)+"°",2,Y(max)+4);g.fillText(Math.round(min)+"°",2,Y(min)+4);
   [0,6,12,18,23].forEach(i=>{if(H.time[i0+i])g.fillText(new Date(H.time[i0+i]).toLocaleTimeString([],{hour:"numeric"}),X(i)-8,Hh-2);});
   g.fillStyle="#5bb8d9";g.fillText("bars = precip %",cv.width-84,10);}
+/* Sentinel Assistant: deterministic parser over live state. It cites what it uses,
+   controls only what is safe, and says plainly when it does not know. */
+function assistant(q){
+  const s=q.toLowerCase();
+  const c=map.getCenter(),z=map.getZoom();
+  const inView=(arr,f)=>{const b=map.getBounds();return arr.filter(x=>{const p=f(x);
+    return p.lat>=b.getSouth()&&p.lat<=b.getNorth()&&p.lon>=b.getWest()&&p.lon<=b.getEast();});};
+  if(/what am i looking|where am i/.test(s)){
+    const vq=inView(S.quakes,x=>x),vf=inView(S.fires,x=>x),va=alertPoints().length;
+    return `View center ${c.lat.toFixed(3)}, ${c.lng.toFixed(3)} at zoom ${z.toFixed(1)}. In this viewport: ${vq.length} quakes (feed window), ${vf.length} fire detections, ${va} located alerts overall, ${Object.keys(S.ships).length} ships in memory, ${S.aircraft.length} aircraft last fetch. Sources & freshness are on the feed chips; this is current fetched state, not a claim of completeness.`;}
+  if(/summari[sz]e.*alert|alerts.*(here|area|summary)/.test(s)){
+    const cl=alertClusters();if(!cl.length)return "No active located alerts in the current feeds. Quiet is a valid result.";
+    return cl.slice(0,4).map((k,i)=>`Cluster ${i+1}: ${k.pts.length} alert(s) near ${k.lat.toFixed(1)}, ${k.lon.toFixed(1)} — leading event: ${esc(k.pts[0].ev||"?")}`).join("<br>")+`<br><span class="finer">Source: NWS · click ◎ Cluster buttons in the Alerts tab to fly + pulse.</span>`;}
+  if(/(take|fly|go).*(cluster|highest|biggest)/.test(s)){centerAlertCluster(0);
+    return "Flying to the largest alert cluster and pulsing every alert in it. Count and centroid method are shown in the Alerts tab.";}
+  if(/only show quakes? (over|above|>=?) ?(\d+(?:\.\d+)?)/.test(s)){
+    const m=s.match(/(\d+(?:\.\d+)?)\s*$/)||s.match(/(over|above|>=?) ?(\d+(?:\.\d+)?)/);
+    const v=+(m[2]||m[1]);try{map.setFilter("quakes",[">=",["coalesce",["get","mag"],0],v]);}catch(e){}
+    return `Quake layer filtered to M ≥ ${v}. Say "show all quakes" to clear.`;}
+  if(/show all quakes|clear quake filter/.test(s)){try{map.setFilter("quakes",null);}catch(e){}return "Quake filter cleared.";}
+  if(/turn off (\w+)|hide (\w+)/.test(s)){const m=s.match(/(?:turn off|hide) (\w+)/);
+    const k=Object.keys(LAYERS).find(k=>k.includes(m[1])||LAYERS[k].name.toLowerCase().includes(m[1]));
+    if(k){LAYERS[k].on=false;applyLayerVisibility();renderLayerList();return `${LAYERS[k].name} turned off.`;}
+    return "I don't have a layer matching that name — the Layers panel lists them all.";}
+  if(/turn on (\w+)|show (\w+) layer/.test(s)){const m=s.match(/(?:turn on|show) (\w+)/);
+    const k=Object.keys(LAYERS).find(k=>k.includes(m[1])||LAYERS[k].name.toLowerCase().includes(m[1]));
+    if(k){LAYERS[k].on=true;applyLayerVisibility();renderLayerList();return `${LAYERS[k].name} turned on.`;}
+    return "No layer by that name.";}
+  if(/zoom.*(home|my location)|take me home/.test(s)){flyPulse(cfg.home.lon,cfg.home.lat,10,"home");return `Centered on ${esc(cfg.home.name)}.`;}
+  if(/what changed|since yesterday/.test(s)){
+    const base=store.get("base",[]);if(base.length<2)return "Not enough recorded history yet — the baseline records a snapshot every ~6 hours while the app is open. Ask again after a day of use.";
+    const a=base[base.length-1],b0=base.find(x=>Date.parse(a.d)-Date.parse(x.d)>=72e6)||base[0];
+    return `Comparing your snapshots (${new Date(b0.d).toLocaleString()} → ${new Date(a.d).toLocaleString()}): quakes near home ${b0.q}→${a.q}, fire detections ${b0.f}→${a.f}, local alerts ${b0.a}→${a.a}${a.kp!=null&&b0.kp!=null?`, Kp ${b0.kp}→${a.kp}`:""}${a.gs&&b0.gs?`, peak grid stress ${b0.gs}→${a.gs}`:""}. These are your recorded observations, not a global audit.`;}
+  if(/missing|no data|coverage/.test(s)){
+    const off=Object.keys(ADAPTERS).filter(k=>!ADAPTERS[k].enabled()),bad=Object.keys(ADAPTERS).filter(k=>ADAPTERS[k].lastErr);
+    return `Feeds off (key or layer needed): ${off.map(k=>(FEEDMETA[k]||{lbl:k}).lbl).join(", ")||"none"}. Feeds failing: ${bad.map(k=>(FEEDMETA[k]||{lbl:k}).lbl).join(", ")||"none"}. Also true everywhere: ocean areas have thin AIS/ADS-B coverage, and an empty region can mean "no sensors", not "nothing happening" — the Registry tab documents each source's coverage.`;}
+  if(/center of.*alert|alert.*center/.test(s)){const cl=alertClusters();if(!cl.length)return "No located alerts to average.";
+    return `Weighted center of the largest cluster: ${cl[0].lat.toFixed(3)}, ${cl[0].lon.toFixed(3)} (${cl[0].pts.length} alerts). Say "take me to the biggest cluster" to fly there.`;}
+  if(/why.*quake|cluster.*here/.test(s))return "I can show the pattern but I won't invent the cause: click the quake icons for USGS details, toggle the Fault Lines layer to see mapped structures, and note that aftershock sequences and injection-related seismicity (documented in North Texas) are the two most common cluster explanations. Confirming either takes USGS event pages, not this map alone.";
+  return `I did not recognize that. I can: "what am I looking at" · "summarize alerts" · "take me to the biggest cluster" · "center of alerts" · "only show quakes over 4" / "show all quakes" · "turn off/on [layer]" · "zoom to home" · "what changed since yesterday" · "what data is missing". I only report fetched data — I never guess.`;}
 function sitrep(){
   const L=S.anomalies;if(!L.length)return `<div class="finer" style="border:1px solid #163026;border-radius:8px;padding:6px 8px;margin-bottom:6px"><b>SITREP — QUIET.</b> ${Object.keys(ADAPTERS).length} feeds instrumented, no anomalies above threshold. Quiet is a finding, not a gap.</div>`;
   const mx=Math.max(...L.map(a=>a.sev));
@@ -1490,13 +1600,17 @@ const REGISTRY=[
 function renderTab(){
   const B=$("tabBody");
   if(curTab==="alerts"){const list=S.alerts.filter(a=>a.local||a.sev==="Extreme"||a.sev==="Severe");
-    B.innerHTML=list.length?`<table><tr><th>Event</th><th>Severity</th><th>Area</th><th>From</th></tr>`+
+    const cl=alertClusters();
+    const clBar=cl.length?`<div class="row" style="flex-wrap:wrap;gap:4px;margin-bottom:6px">
+      ${cl.slice(0,6).map((c,i)=>`<button class="hbtn" data-cluster="${i}" title="fly to the weighted center and pulse every alert in it">◎ Cluster ${i+1} · ${c.pts.length} alert(s)</button>`).join("")}
+      <span class="finer">${cl.length} cluster(s) — alerts within ~300 mi group together; centered on their mean point (estimate)</span></div>`:"";
+    B.innerHTML=clBar+(list.length?`<table><tr><th>Event</th><th>Severity</th><th>Area</th><th>From</th></tr>`+
       list.slice(0,60).map(a=>{let fl="";if(a.geom&&a.geom.coordinates){try{const c=a.geom.type==="Polygon"?a.geom.coordinates[0]:a.geom.coordinates[0][0];
         const lo=c.reduce((s,p)=>s+p[0],0)/c.length,la=c.reduce((s,p)=>s+p[1],0)/c.length;
         fl=` style="cursor:pointer" data-fly="${lo.toFixed(3)},${la.toFixed(3)},8" title="show on map"`;}catch(e){}}
       else if(a.local)fl=` style="cursor:pointer" data-fly="${cfg.home.lon},${cfg.home.lat},9" title="near your home location"`;
       return `<tr${fl}><td>${fl?"◎ ":""}${esc(a.event)}${a.mock?' <span class="badge b-mock">MOCK</span>':""}</td><td>${esc(a.sev||"")}</td><td>${esc((a.area||"").slice(0,70))}</td><td>${esc(a.sender||"NWS")}</td></tr>`;}).join("")+"</table>"
-      :`<div class="finer">No active alerts for your location, and no Extreme/Severe alerts fetched nationally. Quiet is a valid result.</div>`;}
+      :`<div class="finer">No active alerts for your location, and no Extreme/Severe alerts fetched nationally. Quiet is a valid result.</div>`);}
   if(curTab==="grid"){const rows=Object.values(S.ba).filter(b=>b.d).sort((a,b)=>(b.d/b.df||0)-(a.d/a.df||0));
     B.innerHTML=cfg.eiaKey||S.mock?(rows.length?`<table><tr><th>BA</th><th>Region</th><th>Demand MWh</th><th>Forecast MWh</th><th>Δ vs forecast</th><th>Hour (UTC)</th></tr>`+
       rows.map(b=>{const s=b.df?b.d/b.df:null;const _fly=` style="cursor:pointer" data-bafly="${b.code}" title="fly to ${b.code} and pulse it"`;
@@ -1515,6 +1629,15 @@ function renderTab(){
   if(curTab==="anomalies"){
     const list=S.anomalies.filter(a=>!S.integrity||a.conf==="HIGH"||a.conf==="OFFICIAL");
     B.innerHTML=sitrep()+(list.length?list.map(anomCard).join(""):`<div class="finer">Nothing anomalous flagged. Quiet is a valid result.</div>`);}
+  if(curTab==="assist"){
+    B.innerHTML=`<div class="row"><input id="asIn" placeholder="Try: what am I looking at · summarize alerts · take me to the biggest alert cluster · only show quakes over 4 · what changed since yesterday · zoom to home" style="flex:1">
+      <button class="hbtn" id="asGo">▶</button></div><div id="asLog">${(S.asLog||[]).join("")}</div>`;
+    const run=()=>{const q=$("asIn").value.trim();if(!q)return;$("asIn").value="";
+      const ans=assistant(q);S.asLog=S.asLog||[];
+      S.asLog.unshift(`<div class="anom s1" style="margin-top:6px"><div class="finer">▸ ${esc(q)}</div><div>${ans}</div></div>`);
+      S.asLog=S.asLog.slice(0,20);renderTab();};
+    $("asGo").addEventListener("click",run);
+    $("asIn").addEventListener("keydown",e=>{if(e.key==="Enter")run();});}
   if(curTab==="registry"){
     const tierName={1:"Official operational",2:"Official dataset/science",3:"Aggregator",4:"Open/crowdsourced",5:"Secondary mirror",6:"Model/inference",7:"User journal"};
     const row=r=>`<tr><td>${r.m==="grid"?"⚡":"🌍"}</td><td>${r.u?`<a href="${r.u}" target="_blank" rel="noopener" style="color:var(--vir3)">${esc(r.n)} ↗</a>`:esc(r.n)}</td>
@@ -1635,7 +1758,7 @@ function applyImport(j){
     if(Array.isArray(j.journal))store.set("journal",j.journal);
     if(Array.isArray(j.customKeys))store.set("customKeys",j.customKeys);
     if(j.layers)for(const k in j.layers)if(LAYERS[k])LAYERS[k].on=!!j.layers[k];
-    applyLayerVisibility();const APP_VERSION="8.0";
+    applyLayerVisibility();const APP_VERSION="9.0";
 $("verTag").textContent="v"+APP_VERSION+" · PUBLIC TELEMETRY";document.title="Sentinel Globe v"+APP_VERSION;
 ledger("Boot","","Sentinel Globe v"+APP_VERSION+" started","OK","OFFICIAL","if the header does not show this version number, your browser is serving a cached copy");
 renderBookmarks();renderPresets();}
@@ -1651,6 +1774,11 @@ $("btnSettings").addEventListener("click",()=>{
   <div id="ckRows">${custom.map((c,i)=>`<div class="row" style="margin:2px 0"><input class="ckL" placeholder="Label (e.g. AirNow)" value="${esc(c.label)}" style="flex:1"><input class="ckV" placeholder="Key value" value="${esc(c.value)}" style="flex:2"></div>`).join("")}</div>
   <button class="subbtn" id="ckAdd">＋ Add another key</button>
   <label>Home watch zone (ZIP / city / landmark / lat,lon)</label><input id="setHome" value="" placeholder="${esc(cfg.home.name)}">
+  <label>Behavior</label>
+  <div id="behaveRows">
+    ${[["showAlt","Show viewing-altitude readout"],["enrich","Local telemetry enrichment (30 s dwell)"],["autoStreet","Auto-switch to satellite imagery at street zoom"],["clutter","Reduce clutter at global zoom"]]
+      .map(([k,lbl])=>`<label class="satrow"><input type="checkbox" data-behave="${k}" ${cfg[k]!==false?"checked":""}> ${lbl}</label>`).join("")}
+  </div>
   <div class="row">
     <button class="hbtn" id="btnExpKeys" title="One file with all keys — move it to any machine">⇩ Export keys</button>
     <button class="hbtn" id="btnExpAll" title="Keys + bookmarks + presets + layout in one file">⇩ Export FULL backup</button>
@@ -1665,6 +1793,10 @@ $("btnSettings").addEventListener("click",()=>{
   $("ckAdd").addEventListener("click",()=>{const d=document.createElement("div");d.className="row";d.style.margin="2px 0";
     d.innerHTML=`<input class="ckL" placeholder="Label" style="flex:1"><input class="ckV" placeholder="Key value" style="flex:2">`;
     $("ckRows").appendChild(d);});
+  document.querySelectorAll("[data-behave]").forEach(cb=>cb.addEventListener("change",()=>{
+    cfg[cb.dataset.behave]=cb.checked;store.set(cb.dataset.behave,cb.checked);
+    if(cb.dataset.behave==="showAlt")updateAlt();
+    if(cb.dataset.behave==="clutter")applyClutter();}));
   $("setSave").addEventListener("click",async()=>{
     KEYFIELDS.forEach(([k])=>{cfg[k]=$("set_"+k).value.trim();store.set(k,cfg[k]);});
     const Ls=[...document.querySelectorAll("#ckRows .ckL")],Vs=[...document.querySelectorAll("#ckRows .ckV")];
@@ -1814,6 +1946,40 @@ map.on("load",applyPerf);
 /* ---- Coordinate readout: live hover chip + right-click popup with Bookmark-here ---- */
 const cchip=document.createElement("div");cchip.id="coordChip";document.getElementById("mapWrap").appendChild(cchip);
 let cchipT=0;
+/* ---- Viewing-altitude estimate: meters/pixel at center × canvas geometry ÷ tan(half-FOV).
+   Labeled EST because pitch and globe curvature make it approximate. ---- */
+const altChip=document.createElement("div");altChip.id="altChip";document.getElementById("mapWrap").appendChild(altChip);
+function fmtAlt(m){const ft=m*3.28084,mi=m/1609.34;
+  if(ft<1200)return "Street level";
+  if(mi<1)return Math.round(ft).toLocaleString()+" ft";
+  if(mi<100)return mi.toFixed(1)+" mi";
+  return Math.round(mi).toLocaleString()+" mi";}
+function updateAlt(){
+  if(cfg.showAlt===false){altChip.style.display="none";return;}altChip.style.display="";
+  const z=map.getZoom(),lat=map.getCenter().lat;
+  const mpp=156543.03392*Math.cos(lat*Math.PI/180)/Math.pow(2,z);
+  const fov=(map.transform&&map.transform.fov?map.transform.fov:36.87)*Math.PI/180;
+  const alt=(map.getCanvas().height/2)*mpp/Math.tan(fov/2)/(window.devicePixelRatio||1);
+  altChip.textContent="Alt (est): "+fmtAlt(alt);
+  /* street transition offer */
+  streetCheck(z);}
+function applyClutter(){
+  const on=cfg.clutter!==false;
+  try{map.setLayerZoomRange&&["fires","power-subs"].forEach(id=>map.getLayer(id)&&map.setLayerZoomRange(id,on?3.5:0,24));}catch(e){}
+  try{map.getLayer("quakes")&&!map.getFilter("quakes")&&map.setFilter("quakes",on?["any",["<",["zoom"],1e9],[">=",["coalesce",["get","mag"],0],0]]:null);}catch(e){}}
+map.on("load",applyClutter);
+map.on("move",()=>{updateAlt();});map.on("load",updateAlt);
+const streetBtn=document.createElement("button");streetBtn.id="streetBtn";streetBtn.className="hbtn";
+streetBtn.textContent="👁 Street View here";document.getElementById("mapWrap").appendChild(streetBtn);
+streetBtn.addEventListener("click",()=>{const c=map.getCenter();
+  window.open(`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${c.lat.toFixed(6)},${c.lng.toFixed(6)}`,"_blank");
+  ledger("Street View","google.com/maps","opened ground-level imagery at view center","OK","MEASURED","Google's imagery, opened externally — no free embeddable street-view API exists");});
+let preStreetBasemap=null;
+function streetCheck(z){
+  streetBtn.style.display=z>=16?"block":"none";
+  if(cfg.autoStreet===false)return;
+  if(z>=16.6&&(cfg.basemap||"osm")!=="sat"){preStreetBasemap=cfg.basemap||"osm";try{setBasemap("sat");}catch(e){}}
+  else if(z<14.5&&preStreetBasemap){try{setBasemap(preStreetBasemap);}catch(e){}preStreetBasemap=null;}}
 map.on("mousemove",e=>{const t=now();if(t-cchipT<80)return;cchipT=t;
   cchip.textContent=e.lngLat.lat.toFixed(5)+", "+e.lngLat.lng.toFixed(5);});
 cchip.addEventListener("click",()=>{navigator.clipboard&&navigator.clipboard.writeText(cchip.textContent);
