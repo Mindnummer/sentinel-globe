@@ -549,6 +549,7 @@ function setBasemap(id){
     map.setLayoutProperty(l,"visibility",active.includes(l)?"visible":"none"));
   document.querySelectorAll("[data-bm]").forEach(b=>b.classList.toggle("on",b.dataset.bm===id));
   $("mapAttrib").textContent=BASEMAPS[id].attrib+" · Radar NOAA/IEM · Counties US Census · MapLibre";
+  if(aeOpen)aeScheduleDraw(); // polar honors the shared basemap state immediately
 }
 document.addEventListener("click",e=>{const b=e.target.closest("[data-bm]");if(b)setBasemap(b.dataset.bm);});
 map.on("load",()=>setBasemap(cfg.basemap||"osm"));
@@ -937,7 +938,9 @@ function pulseAt(lon,lat,label){
     const r=16+14*Math.abs(Math.sin(hlPhase/4));
     try{map.setPaintProperty("hl","circle-radius",r);
         map.setPaintProperty("hl","circle-stroke-opacity",0.35+0.6*Math.abs(Math.cos(hlPhase/4)));}catch(e){}
-    if(hlPhase>90){clearInterval(hlTimer);map.getSource("hl").setData({type:"FeatureCollection",features:[]});}
+    if(hlPhase>90){clearInterval(hlTimer); // decay into a steady anchor ring — selection survives view switches
+      try{map.setPaintProperty("hl","circle-radius",11);map.setPaintProperty("hl","circle-stroke-opacity",0.65);
+          map.setPaintProperty("hl","circle-opacity",0.12);}catch(e){}}
   },90);}
 function pulseLayer(k){
   const L=LAYERS[k];if(!L)return;
@@ -982,9 +985,9 @@ function centerAlertCluster(i){const cl=alertClusters();if(!cl.length)return;
   ledger("Alert cluster","",`centered cluster of ${c.pts.length} alert(s)`,"OK","OFFICIAL","centroid = mean of alert-polygon centers");}
 document.addEventListener("click",e=>{
   const b=e.target.closest("[data-bafly]");if(b){const c=BA_CENTROIDS[b.dataset.bafly];
-    if(c)flyPulse(c.lon,c.lat,5.4,b.dataset.bafly);return;}
+    if(c){S.sel={lat:c.lat,lon:c.lon,label:b.dataset.bafly};goTo(c.lon,c.lat,5.4,b.dataset.bafly);}return;}
   const g=e.target.closest("[data-fly]");if(g){const[lo,la,z]=g.dataset.fly.split(",").map(Number);
-    if(isFinite(lo)&&isFinite(la))flyPulse(lo,la,z||7);}});
+    if(isFinite(lo)&&isFinite(la)){S.sel={lat:la,lon:lo,label:""};goTo(lo,la,z||7);}}});
 
 /* ---- ISS ground track: real TLE + SGP4, split at the date line so the "NASA wave" draws cleanly ---- */
 async function updateIssTrack(){
@@ -1764,7 +1767,7 @@ function applyImport(j){
     if(Array.isArray(j.journal))store.set("journal",j.journal);
     if(Array.isArray(j.customKeys))store.set("customKeys",j.customKeys);
     if(j.layers)for(const k in j.layers)if(LAYERS[k])LAYERS[k].on=!!j.layers[k];
-    applyLayerVisibility();const APP_VERSION="9.1";
+    applyLayerVisibility();const APP_VERSION="9.2";
 $("verTag").textContent="v"+APP_VERSION+" · PUBLIC TELEMETRY";document.title="Sentinel Globe v"+APP_VERSION;
 ledger("Boot","","Sentinel Globe v"+APP_VERSION+" started","OK","OFFICIAL","if the header does not show this version number, your browser is serving a cached copy");
 renderBookmarks();renderPresets();}
@@ -1937,12 +1940,14 @@ function setView(mode,opts){
   const from=viewMode;viewMode=mode;
   ["btnViewGlobe","btnViewFlat","btnAELab"].forEach(id=>$(id).classList.remove("on"));
   if(mode!=="polar"&&aeOpen)closeAEPane(!opts.noSync); // leaving polar: sync map to where you were looking
+  /* Views are lenses on ONE location. Switching lenses never moves the camera —
+     only an explicit opts.center (a deliberate navigation) does. */
   if(mode==="globe"){$("btnViewGlobe").classList.add("on");
     try{map.setProjection({type:"globe"});}catch(e){}
-    if(!opts.keepCam)map.easeTo({center:opts.center||[cfg.home.lon,30],zoom:opts.zoom||2.2,pitch:0,bearing:0,duration:1400});}
+    if(opts.center)map.easeTo({center:opts.center,zoom:opts.zoom||map.getZoom(),duration:1400});}
   if(mode==="flat"){$("btnViewFlat").classList.add("on");
     try{map.setProjection({type:"mercator"});}catch(e){}
-    if(!opts.keepCam)map.easeTo({center:opts.center||[0,20],zoom:opts.zoom||1.2,pitch:0,bearing:0,duration:1400});}
+    if(opts.center)map.easeTo({center:opts.center,zoom:opts.zoom||map.getZoom(),duration:1400});}
   if(mode==="polar"){$("btnAELab").classList.add("on");
     const mc=map.getCenter(),mz=map.getZoom();
     openAEPane();
@@ -2079,10 +2084,11 @@ function goTo(lon,lat,z,label){
 function openAEPane(){if(!aeOpen)openAELab();}
 function closeAEPane(sync){
   if(!aeOpen)return;
-  let c=null;const cv=document.getElementById("aeCanvas");
-  if(sync&&cv)c=aeInverse(cv.width/2,cv.height/2,cv.width/2,cv.height/2,aeR);
+  let c=null,zEq=null;const cv=document.getElementById("aeCanvas");
+  if(sync&&cv){c=aeInverse(cv.width/2,cv.height/2,cv.width/2,cv.height/2,aeR);
+    zEq=Math.max(0.8,Math.min(19.4,Math.log2(aeR/(cv.height*0.42))+2.2));} // exact inverse of the entry scale mapping
   openAELab(); // toggles off + cleans listeners
-  if(c)map.jumpTo({center:[c.lon,c.lat]}); // exit looking at the same place
+  if(c)map.jumpTo({center:[c.lon,c.lat],zoom:zEq!=null?zEq:map.getZoom()}); // same place, same scale
 }
 function openAELab(){
   aeOpen=!aeOpen;
@@ -2099,6 +2105,7 @@ function openAELab(){
     <div id="aeTop">
       <span id="aeCoord">drag = pan · scroll = zoom</span>
       <span class="finer">overlays follow your Layers panel</span>
+      <span class="finer" id="aeBmNote" data-bm="" style="color:#8fa69e"></span>
       <label class="satrow"><input type="checkbox" id="aeC" checked>counties</label>
       <button class="hbtn" id="aeHome" title="fly to your home watch zone">⌂ Home</button>
       <button class="hbtn" id="aeClose" title="Esc also exits">✕ Back to globe</button>
@@ -2139,12 +2146,20 @@ function openAELab(){
   aeDrawTimer=setInterval(aeScheduleDraw,5000); // periodic refresh for live data
 }
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&aeOpen)setView("globe",{keepCam:true});});
+const AE_THEMES={ // the polar view honors your basemap choice as far as a vector renderer honestly can
+  osm:{bg:"#f2efe9",coast:"#4a6a58",county:"#b9c9c0",grat:"#d8d2c6",note:"street basemap (vector rendering)"},
+  sat:{bg:"#020b12",coast:"#5fbf9f",county:"#1d3a4a",grat:"#122430",note:"satellite imagery can't be re-projected in polar view — vector fallback; your choice is preserved for the other views"},
+  topo:{bg:"#0d1a12",coast:"#7fb98f",county:"#2a4636",grat:"#1c3326",note:"terrain imagery can't be re-projected in polar view — vector fallback; your choice is preserved for the other views"},
+  dark:{bg:"#04120c",coast:"#5fbf9f",county:"#2f5546",grat:"#1d3a2f",note:"dark basemap"}};
 function drawAE(){
   const cv=document.getElementById("aeCanvas");if(!cv)return;const g=cv.getContext("2d");
   const cx=cv.width/2,cy=cv.height/2,R=aeR,W=cv.width,H=cv.height,M=60;
+  const th=AE_THEMES[cfg.basemap]||AE_THEMES.dark;
+  const noteEl=document.getElementById("aeBmNote");
+  if(noteEl&&noteEl.dataset.bm!==cfg.basemap){noteEl.dataset.bm=cfg.basemap;noteEl.textContent=th.note;}
   const vis=(x,y)=>x>-M&&x<W+M&&y>-M&&y<H+M;
-  g.fillStyle="#04120c";g.fillRect(0,0,W,H);
-  g.strokeStyle="#1d3a2f";g.lineWidth=1;
+  g.fillStyle=th.bg;g.fillRect(0,0,W,H);
+  g.strokeStyle=th.grat;g.lineWidth=1;
   for(let la=60;la>=-90;la-=30){g.beginPath();g.arc(cx+aeTx,cy+aeTy,(90-la)/180*R,0,7);g.stroke();}
   for(let lo=0;lo<360;lo+=30){const[a,b]=aeXY(-90,lo,cx,cy,R);g.beginPath();g.moveTo(cx+aeTx,cy+aeTy);g.lineTo(a,b);g.stroke();}
   const draw=cs=>{const[fx,fy]=aeXY(cs[0][1],cs[0][0],cx,cy,R);
@@ -2158,9 +2173,9 @@ function drawAE(){
     else if(G.type==="MultiPolygon")G.coordinates.forEach(p=>p.forEach(draw));
     else if(G.type==="LineString")draw(G.coordinates);
     else if(G.type==="MultiLineString")G.coordinates.forEach(draw);}};
-  g.strokeStyle="#5fbf9f";g.lineWidth=1.2;if(AE_WORLD)drawFC(AE_WORLD);
+  g.strokeStyle=th.coast;g.lineWidth=1.2;if(AE_WORLD)drawFC(AE_WORLD);
   const cOn=document.getElementById("aeC");
-  if(AE_COUNTIES&&(!cOn||cOn.checked)&&R>1200){g.strokeStyle="#2f5546";g.lineWidth=0.7;drawFC(AE_COUNTIES);}
+  if(AE_COUNTIES&&(!cOn||cOn.checked)&&R>1200){g.strokeStyle=th.county;g.lineWidth=0.7;drawFC(AE_COUNTIES);}
   /* overlays follow the main Layers panel — one state, two renderers */
   if(LAYERS.faults&&LAYERS.faults.on){
     if(!AE_FAULTS)fetch("faults.geojson").then(r=>r.ok?r.json():null).then(j=>{AE_FAULTS=j;aeScheduleDraw();}).catch(()=>{});
@@ -2192,6 +2207,10 @@ function drawAE(){
       g.fillStyle="#7fd4ff";g.beginPath();g.arc(ix,iy,5,0,7);g.fill();g.font="11px sans-serif";g.fillText("ISS",ix+7,iy);}}
   const[hx,hy]=aeXY(cfg.home.lat,cfg.home.lon,cx,cy,R);
   if(vis(hx,hy)){g.fillStyle="#e0b24b";g.beginPath();g.arc(hx,hy,4,0,7);g.fill();g.font="11px sans-serif";g.fillText("home",hx+6,hy);}
+  if(S.sel){const[sx2,sy2]=aeXY(S.sel.lat,S.sel.lon,cx,cy,R);
+    if(vis(sx2,sy2)){g.strokeStyle="#ff7ac2";g.lineWidth=2;g.globalAlpha=0.75;
+      g.beginPath();g.arc(sx2,sy2,9,0,7);g.stroke();g.globalAlpha=1;
+      if(S.sel.label){g.fillStyle="#ff7ac2";g.font="10px sans-serif";g.fillText(S.sel.label,sx2+11,sy2);}}}
   if(aePulse&&now()<aePulse.until){const[qx,qy]=aeXY(aePulse.lat,aePulse.lon,cx,cy,R);
     const ph=(now()%1200)/1200;
     g.strokeStyle="#ff7ac2";g.lineWidth=2.5;g.globalAlpha=1-ph;
