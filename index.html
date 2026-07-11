@@ -56,13 +56,15 @@ h2:first-child{margin-top:0}
 #coordChip{position:absolute;left:8px;bottom:6px;z-index:26;font-size:10.5px;color:#9fb8ae;
   background:#04120ccc;border:1px solid #163026;border-radius:8px;padding:2px 8px;cursor:pointer;user-select:none}
 #coordChip:hover{color:#7fe0bd}
-#altChip{position:absolute;left:8px;bottom:26px;z-index:26;font-size:10.5px;color:#9fb8ae;
+#altChip{position:absolute;left:8px;bottom:26px;z-index:46;font-size:10.5px;color:#9fb8ae;
   background:#04120ccc;border:1px solid #163026;border-radius:8px;padding:2px 8px;user-select:none}
 #streetBtn{position:absolute;left:50%;transform:translateX(-50%);bottom:10px;z-index:27;display:none}
 #enrichChip{position:absolute;right:8px;bottom:26px;z-index:26;font-size:10.5px;color:#7fe0bd;
   background:#04120ccc;border:1px solid #163026;border-radius:8px;padding:2px 8px;display:none}
 #aePane{position:absolute;inset:0;z-index:40;background:#04120c}
-#aePane canvas{width:100%;height:100%;display:block;cursor:grab;touch-action:none}
+#aePane{perspective:1000px;overflow:hidden}
+#aePane canvas{width:100%;height:100%;display:block;cursor:grab;touch-action:none;
+  transform-origin:50% 58%;will-change:transform}
 #aeTop{position:absolute;top:6px;left:8px;right:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;
   background:#0a1a14cc;border:1px solid #163026;border-radius:10px;padding:4px 8px;font-size:11px}
 #aeHandoff{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);z-index:41}
@@ -311,6 +313,11 @@ body.focus #mobileNav{display:none!important}
 
 <div id="modalBack"><div id="modal"></div></div>
 <script>
+/* ===== SINGLE SOURCE OF TRUTH for the build version — bump ONLY here ===== */
+const APP_VERSION="9.3";
+document.title="Sentinel Globe v"+APP_VERSION+" — Public Telemetry";
+document.addEventListener("DOMContentLoaded",()=>{const v=document.getElementById("verTag");
+  if(v)v.textContent="v"+APP_VERSION+" · PUBLIC TELEMETRY";});
 /* =====================================================================
    SENTINEL GLOBE v2 — core
    Integrity law: every value carries {source, timestamp, confidence}.
@@ -1767,10 +1774,8 @@ function applyImport(j){
     if(Array.isArray(j.journal))store.set("journal",j.journal);
     if(Array.isArray(j.customKeys))store.set("customKeys",j.customKeys);
     if(j.layers)for(const k in j.layers)if(LAYERS[k])LAYERS[k].on=!!j.layers[k];
-    applyLayerVisibility();const APP_VERSION="9.2";
-$("verTag").textContent="v"+APP_VERSION+" · PUBLIC TELEMETRY";document.title="Sentinel Globe v"+APP_VERSION;
-ledger("Boot","","Sentinel Globe v"+APP_VERSION+" started","OK","OFFICIAL","if the header does not show this version number, your browser is serving a cached copy");
-renderBookmarks();renderPresets();}
+    applyLayerVisibility();
+    renderBookmarks();renderPresets();}
   renderLayerList();runAll(true);
   ledger("Vault","","import applied ("+j.type+")","OK","OFFICIAL","validated shape before applying");}
 $("btnSettings").addEventListener("click",()=>{
@@ -1982,6 +1987,13 @@ function fmtAlt(m){const ft=m*3.28084,mi=m/1609.34;
   return Math.round(mi).toLocaleString()+" mi";}
 function updateAlt(){
   if(cfg.showAlt===false){altChip.style.display="none";return;}altChip.style.display="";
+  if(aeOpen){ // polar mode: derive from the projection scale via the shared zoom-equivalence
+    const cv=document.getElementById("aeCanvas");
+    const zP=Math.max(1.2,Math.min(19,Math.log2(aeR/(((cv&&cv.height)||700)*0.42))+2.2));
+    const c=cv?aeInverse(cv.width/2,cv.height/2,cv.width/2,cv.height/2,aeR):null;
+    const mppP=156543.03392*Math.cos((c?c.lat:45)*Math.PI/180)/Math.pow(2,zP);
+    const altP=(((cv&&cv.height)||700)/2)*mppP/Math.tan(18.4*Math.PI/180)/(window.devicePixelRatio||1);
+    altChip.textContent="Alt (est): "+fmtAlt(altP);return;}
   const z=map.getZoom(),lat=map.getCenter().lat;
   const mpp=156543.03392*Math.cos(lat*Math.PI/180)/Math.pow(2,z);
   const fov=(map.transform&&map.transform.fov?map.transform.fov:36.87)*Math.PI/180;
@@ -2067,7 +2079,8 @@ function aeInverse(x,y,cx,cy,R){const dx=x-cx-aeTx,dy=y-cy-aeTy,r=Math.hypot(dx,
   if(r>R*1.02)return null;
   const lat=90-r/R*180;let lon=Math.atan2(dx,-dy)*180/Math.PI-aeRot;
   lon=((lon+540)%360)-180;return{lat,lon};}
-function aeScheduleDraw(){if(aeDrawQueued)return;aeDrawQueued=true;
+function aeScheduleDraw(){try{updateAlt();}catch(e){}
+  if(aeDrawQueued)return;aeDrawQueued=true;
   requestAnimationFrame(()=>{aeDrawQueued=false;drawAE();});}
 function aeGoTo(lat,lon,z){ // center the polar view on a point; z ~ tile-zoom equivalence
   const cv=document.getElementById("aeCanvas");if(!cv)return;
@@ -2107,6 +2120,8 @@ function openAELab(){
       <span class="finer">overlays follow your Layers panel</span>
       <span class="finer" id="aeBmNote" data-bm="" style="color:#8fa69e"></span>
       <label class="satrow"><input type="checkbox" id="aeC" checked>counties</label>
+      <span class="finer">tilt <input type="range" id="aeTilt" min="0" max="62" step="1" value="0" style="width:70px;vertical-align:middle"></span>
+      <button class="hbtn" id="aeReset" title="flatten tilt, stop spin drift, recenter">⟲ Reset view</button>
       <button class="hbtn" id="aeHome" title="fly to your home watch zone">⌂ Home</button>
       <button class="hbtn" id="aeClose" title="Esc also exits">✕ Back to globe</button>
     </div>
@@ -2126,18 +2141,42 @@ function openAELab(){
     const k=e.deltaY<0?1.18:0.85,rect=cv.getBoundingClientRect(),sx=cv.width/rect.width;
     const mx=(e.clientX-rect.left)*sx,my=(e.clientY-rect.top)*sx;
     aeTx=mx-cv.width/2-(mx-cv.width/2-aeTx)*k;aeTy=my-cv.height/2-(my-cv.height/2-aeTy)*k;
-    aeR=Math.max(cv.height*0.35,Math.min(90000,aeR*k));lastInteract=now();aeScheduleDraw();},{passive:false});
+    aeR=Math.max(cv.height*0.35,Math.min(90000,aeR*k));lastInteract=now();
+    if(aeR>=52000&&k>1){ // projection limit — hand off BEFORE quality degrades, never a dead end
+      const c=aeInverse(cv.width/2,cv.height/2,cv.width/2,cv.height/2,aeR);
+      const zEq=Math.max(1.2,Math.min(19,Math.log2(aeR/(cv.height*0.42))+2.2));
+      setView("globe",{noSync:true,keepCam:true});
+      if(c)map.jumpTo({center:[c.lon,c.lat],zoom:zEq});
+      if(typeof enrichChip!=="undefined"){enrichChip.style.display="block";
+        enrichChip.textContent="Polar projection limit reached — switching to local map view (same spot, same scale)";
+        setTimeout(()=>enrichChip.style.display="none",4500);}
+      ledger("View","","polar → local map auto-handoff at projection limit","OK","OFFICIAL","location, scale, basemap, and layers preserved; ◎ button returns to polar");
+      return;}
+    aeScheduleDraw();},{passive:false});
   let drag=false,px=0,py=0;
   cv.addEventListener("pointerdown",e=>{drag=true;px=e.clientX;py=e.clientY;lastInteract=now();cv.setPointerCapture(e.pointerId);});
   cv.addEventListener("pointermove",e=>{
     const rect=cv.getBoundingClientRect(),sx=cv.width/rect.width;
     if(drag){aeTx+=(e.clientX-px)*sx;aeTy+=(e.clientY-py)*sx;px=e.clientX;py=e.clientY;lastInteract=now();aeScheduleDraw();}
-    const p=aeInverse((e.clientX-rect.left)*sx,(e.clientY-rect.top)*sx,cv.width/2,cv.height/2,aeR);
     const el=document.getElementById("aeCoord");
-    if(el)el.textContent=p?p.lat.toFixed(3)+", "+p.lon.toFixed(3):"drag = pan · scroll = zoom";});
+    const tiltEl=document.getElementById("aeTilt");
+    if(tiltEl&&+tiltEl.value>5){if(el)el.textContent="coordinates readout off while tilted — ⟲ Reset to restore";}
+    else{const p=aeInverse((e.clientX-rect.left)*sx,(e.clientY-rect.top)*sx,cv.width/2,cv.height/2,aeR);
+      if(el)el.textContent=p?p.lat.toFixed(3)+", "+p.lon.toFixed(3):"drag = pan · scroll = zoom";}});
   cv.addEventListener("pointerup",()=>drag=false);
   document.getElementById("aeClose").addEventListener("click",()=>setView("globe",{keepCam:true}));
   document.getElementById("aeHome").addEventListener("click",()=>aeGoTo(cfg.home.lat,cfg.home.lon,8.5));
+  /* Tilt: a real perspective transform on the plane. Rotation (ORBIT or drag) spins the
+     projection CONTENT while the tilt holds — an orbit around a tilted table, not a flat clock.
+     Coordinate hover math assumes a flat plane, so it switches off honestly past 5° of tilt. */
+  let aeTiltDeg=0;
+  const applyTilt=()=>{cv.style.transform=aeTiltDeg?`rotateX(${aeTiltDeg}deg)`:"";
+    const co=document.getElementById("aeCoord");
+    if(aeTiltDeg>5&&co)co.textContent="coordinates readout off while tilted — ⟲ Reset to restore";};
+  document.getElementById("aeTilt").addEventListener("input",e=>{aeTiltDeg=+e.target.value;applyTilt();});
+  document.getElementById("aeReset").addEventListener("click",()=>{
+    aeTiltDeg=0;document.getElementById("aeTilt").value=0;applyTilt();
+    aeRot=0;aeGoTo(cfg.home.lat,cfg.home.lon,8.5);});
   document.getElementById("aeC").addEventListener("change",aeScheduleDraw);
   document.getElementById("aeHandoff").addEventListener("click",()=>{
     const c=aeInverse(cv.width/2,cv.height/2,cv.width/2,cv.height/2,aeR);
@@ -2146,6 +2185,81 @@ function openAELab(){
   aeDrawTimer=setInterval(aeScheduleDraw,5000); // periodic refresh for live data
 }
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&aeOpen)setView("globe",{keepCam:true});});
+/* =====================================================================
+   POLAR IMAGERY ENGINE — real tiles, honestly re-projected.
+   Mercator tiles are fetched from the SAME providers as the other views and
+   warped through the azimuthal-equidistant projection with a triangle mesh.
+   Supported: regional zoom and closer (tile counts explode at whole-earth view,
+   so far-out polar stays vector — labeled). Mercator tiles end at ±85°, so the
+   pole caps stay vector too. Real imagery, real limits, both stated.
+   ===================================================================== */
+const AE_TILE_URLS={
+  osm:z=>(x,y)=>`https://tile.openstreetmap.org/${z}/${x}/${y}.png`,
+  sat:z=>(x,y)=>`https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`,
+  topo:z=>(x,y)=>`https://tile.opentopomap.org/${z}/${x}/${y}.png`,
+  dark:z=>(x,y)=>`https://basemaps.cartocdn.com/dark_all/${z}/${x}/${y}.png`};
+const aeTileCache=new Map();let aeTileFails=0;
+function aeTile(z,x,y){
+  const n=1<<z;x=((x%n)+n)%n;if(y<0||y>=n)return null;
+  const key=cfg.basemap+"/"+z+"/"+x+"/"+y;
+  let t=aeTileCache.get(key);
+  if(t)return t;
+  if(aeTileCache.size>220){const k0=aeTileCache.keys().next().value;aeTileCache.delete(k0);}
+  const img=new Image();img.crossOrigin="anonymous";
+  t={img,ok:false};aeTileCache.set(key,t);
+  img.onload=()=>{t.ok=true;aeTileFails=Math.max(0,aeTileFails-1);aeScheduleDraw();};
+  img.onerror=()=>{aeTileFails++;if(aeTileFails===12)ledger("Polar imagery","",`${cfg.basemap} tiles failing to load — vector fallback active`,"WARN","OFFICIAL","provider limit or offline; the view stays usable");};
+  img.src=AE_TILE_URLS[cfg.basemap]?AE_TILE_URLS[cfg.basemap](z)(x,y):AE_TILE_URLS.osm(z)(x,y);
+  return t;}
+function lonLatToMerc(lon,lat,z){ // world pixel coords at tile zoom z
+  const n=256*(1<<z);
+  const x=(lon+180)/360*n;
+  const la=Math.max(-85.05,Math.min(85.05,lat))*Math.PI/180;
+  const y=(1-Math.log(Math.tan(la)+1/Math.cos(la))/Math.PI)/2*n;
+  return[x,y];}
+function drawWarpTriangle(g,img,sx0,sy0,sx1,sy1,sx2,sy2,dx0,dy0,dx1,dy1,dx2,dy2){
+  g.save();g.beginPath();g.moveTo(dx0,dy0);g.lineTo(dx1,dy1);g.lineTo(dx2,dy2);g.closePath();g.clip();
+  const d=sx0*(sy1-sy2)+sx1*(sy2-sy0)+sx2*(sy0-sy1);if(!d){g.restore();return;}
+  const a=(dx0*(sy1-sy2)+dx1*(sy2-sy0)+dx2*(sy0-sy1))/d,
+        b=(dy0*(sy1-sy2)+dy1*(sy2-sy0)+dy2*(sy0-sy1))/d,
+        c=(sx0*(dx1-dx2)+sx1*(dx2-dx0)+sx2*(dx0-dx1))/-d*-1,
+        dd=(sx0*(dy1-dy2)+sx1*(dy2-dy0)+sx2*(dy0-dy1))/-d*-1,
+        e=dx0-a*sx0-c*sy0,f=dy0-b*sx0-dd*sy0;
+  g.transform(a,b,c,dd,e,f);g.drawImage(img,0,0);g.restore();}
+let aeWarpCanvas=null,aeWarpKey="";
+function aeDrawImagery(g,cv,cx,cy,R){
+  const zEq=Math.log2(R/(cv.height*0.42))+2.2;
+  if(zEq<4.2)return false; // whole-earth polar stays vector — tile counts would explode; stated in the note
+  const tz=Math.max(3,Math.min(17,Math.round(zEq)-1));
+  const key=[cfg.basemap,tz,Math.round(aeTx),Math.round(aeTy),Math.round(R),Math.round(aeRot*10),cv.width,cv.height].join("|");
+  if(aeWarpCanvas&&aeWarpKey===key){g.drawImage(aeWarpCanvas,0,0);return true;} // cached warp — pans/zooms rebuild, ticks reuse
+  if(!aeWarpCanvas||aeWarpCanvas.width!==cv.width||aeWarpCanvas.height!==cv.height){
+    aeWarpCanvas=document.createElement("canvas");aeWarpCanvas.width=cv.width;aeWarpCanvas.height=cv.height;}
+  const wg=aeWarpCanvas.getContext("2d");wg.clearRect(0,0,cv.width,cv.height);
+  const NX=16,NY=12;let drew=false;
+  const corner=(i,j)=>{ // screen grid → lat/lon → mercator world px (null = off-disk or polar cap)
+    const px=i/NX*cv.width,py=j/NY*cv.height;
+    const p=aeInverse(px,py,cx,cy,R);
+    if(!p||Math.abs(p.lat)>85)return null;
+    const[mx,my]=lonLatToMerc(p.lon,p.lat,tz);return{px,py,mx,my};};
+  const grid=[];for(let j=0;j<=NY;j++){grid[j]=[];for(let i=0;i<=NX;i++)grid[j][i]=corner(i,j);}
+  for(let j=0;j<NY;j++)for(let i=0;i<NX;i++){
+    const A=grid[j][i],B=grid[j][i+1],C=grid[j+1][i],D=grid[j+1][i+1];
+    if(!A||!B||!C||!D)continue;
+    // date-line guard: skip cells whose source spans a wrap discontinuity
+    const xs=[A.mx,B.mx,C.mx,D.mx];if(Math.max(...xs)-Math.min(...xs)>256*(1<<tz)/2)continue;
+    const cell=[[A,B,C],[B,D,C]];
+    for(const tri of cell){
+      const txs=tri.map(p=>Math.floor(p.mx/256)),tys=tri.map(p=>Math.floor(p.my/256));
+      for(let tX=Math.min(...txs);tX<=Math.min(...txs)+ (Math.max(...txs)-Math.min(...txs)>1?1:Math.max(...txs)-Math.min(...txs));tX++)
+      for(let tY=Math.min(...tys);tY<=Math.max(...tys);tY++){
+        const tt=aeTile(tz,tX,tY);if(!tt||!tt.ok)continue;
+        drawWarpTriangle(wg,tt.img,
+          tri[0].mx-tX*256,tri[0].my-tY*256,tri[1].mx-tX*256,tri[1].my-tY*256,tri[2].mx-tX*256,tri[2].my-tY*256,
+          tri[0].px,tri[0].py,tri[1].px,tri[1].py,tri[2].px,tri[2].py);
+        drew=true;}}}
+  if(drew){aeWarpKey=key;g.drawImage(aeWarpCanvas,0,0);return true;}
+  return false;}
 const AE_THEMES={ // the polar view honors your basemap choice as far as a vector renderer honestly can
   osm:{bg:"#f2efe9",coast:"#4a6a58",county:"#b9c9c0",grat:"#d8d2c6",note:"street basemap (vector rendering)"},
   sat:{bg:"#020b12",coast:"#5fbf9f",county:"#1d3a4a",grat:"#122430",note:"satellite imagery can't be re-projected in polar view — vector fallback; your choice is preserved for the other views"},
@@ -2156,9 +2270,13 @@ function drawAE(){
   const cx=cv.width/2,cy=cv.height/2,R=aeR,W=cv.width,H=cv.height,M=60;
   const th=AE_THEMES[cfg.basemap]||AE_THEMES.dark;
   const noteEl=document.getElementById("aeBmNote");
-  if(noteEl&&noteEl.dataset.bm!==cfg.basemap){noteEl.dataset.bm=cfg.basemap;noteEl.textContent=th.note;}
   const vis=(x,y)=>x>-M&&x<W+M&&y>-M&&y<H+M;
   g.fillStyle=th.bg;g.fillRect(0,0,W,H);
+  const imagery=aeDrawImagery(g,cv,cx,cy,R);
+  if(noteEl){const wantNote=imagery
+      ?`${cfg.basemap} — REAL tiles re-projected live · imagery ends at ±85° (Mercator limit)`
+      :(Math.log2(R/(H*0.42))+2.2>=4.2?th.note+" · imagery loading…":"zoom to regional scale for real "+cfg.basemap+" imagery — vector rendering meanwhile");
+    if(noteEl.textContent!==wantNote)noteEl.textContent=wantNote;}
   g.strokeStyle=th.grat;g.lineWidth=1;
   for(let la=60;la>=-90;la-=30){g.beginPath();g.arc(cx+aeTx,cy+aeTy,(90-la)/180*R,0,7);g.stroke();}
   for(let lo=0;lo<360;lo+=30){const[a,b]=aeXY(-90,lo,cx,cy,R);g.beginPath();g.moveTo(cx+aeTx,cy+aeTy);g.lineTo(a,b);g.stroke();}
@@ -2173,9 +2291,9 @@ function drawAE(){
     else if(G.type==="MultiPolygon")G.coordinates.forEach(p=>p.forEach(draw));
     else if(G.type==="LineString")draw(G.coordinates);
     else if(G.type==="MultiLineString")G.coordinates.forEach(draw);}};
-  g.strokeStyle=th.coast;g.lineWidth=1.2;if(AE_WORLD)drawFC(AE_WORLD);
+  if(!imagery){g.strokeStyle=th.coast;g.lineWidth=1.2;if(AE_WORLD)drawFC(AE_WORLD);}
   const cOn=document.getElementById("aeC");
-  if(AE_COUNTIES&&(!cOn||cOn.checked)&&R>1200){g.strokeStyle=th.county;g.lineWidth=0.7;drawFC(AE_COUNTIES);}
+  if(!imagery&&AE_COUNTIES&&(!cOn||cOn.checked)&&R>1200){g.strokeStyle=th.county;g.lineWidth=0.7;drawFC(AE_COUNTIES);}
   /* overlays follow the main Layers panel — one state, two renderers */
   if(LAYERS.faults&&LAYERS.faults.on){
     if(!AE_FAULTS)fetch("faults.geojson").then(r=>r.ok?r.json():null).then(j=>{AE_FAULTS=j;aeScheduleDraw();}).catch(()=>{});
@@ -2217,13 +2335,14 @@ function drawAE(){
     g.beginPath();g.arc(qx,qy,8+30*ph,0,7);g.stroke();g.globalAlpha=1;
     setTimeout(aeScheduleDraw,80);}
   g.fillStyle="#6b8078";g.font="10px sans-serif";
-  g.fillText("North-polar azimuthal equidistant · Natural Earth · US Census · live data",8,H-6);
+  g.fillText("North-polar azimuthal equidistant · "+((BASEMAPS[cfg.basemap]||{}).attrib||"Natural Earth")+" · US Census · live data"+(LAYERS.radar&&LAYERS.radar.on?"  ·  radar loop not re-projectable here — use Globe/Flat World":""),8,H-6);
   const ho=document.getElementById("aeHandoff");
   if(ho)ho.style.display=R>22000?"block":"none";}
 document.addEventListener("click",e=>{if(e.target.closest("#btnAELab")){
   aeOpen?setView("globe",{keepCam:true}):setView("polar");}});
 
 /* ---- boot: bookmarks, presets, startup profile ---- */
+ledger("Boot","","Sentinel Globe v"+APP_VERSION+" started","OK","OFFICIAL","tab title and header badge both derive from this one constant");
 renderBookmarks();renderPresets();
 map.on("load",()=>{const boot=store.get("startup","");
   if(boot){const p=store.get("presets",{})[boot];
