@@ -314,7 +314,7 @@ body.focus #mobileNav{display:none!important}
 <div id="modalBack"><div id="modal"></div></div>
 <script>
 /* ===== SINGLE SOURCE OF TRUTH for the build version — bump ONLY here ===== */
-const APP_VERSION="9.3";
+const APP_VERSION="9.4";
 document.title="Sentinel Globe v"+APP_VERSION+" — Public Telemetry";
 document.addEventListener("DOMContentLoaded",()=>{const v=document.getElementById("verTag");
   if(v)v.textContent="v"+APP_VERSION+" · PUBLIC TELEMETRY";});
@@ -911,6 +911,8 @@ document.getElementById("mapWrap").appendChild(enrichChip);
 let dwellTimer=null;const enrichedCells=new Set();
 map.on("moveend",()=>{clearTimeout(dwellTimer);
   if(cfg.enrich===false)return;
+  if(typeof followISS!=="undefined"&&followISS)return; // following = constant movement; dwell is meaningless and spams timers
+  if(aeOpen)return; // map is beneath the polar pane; enrich when it's actually visible
   if(map.getZoom()<5.5)return;
   dwellTimer=setTimeout(enrichRegion,30000);});
 async function enrichRegion(){
@@ -1999,14 +2001,15 @@ function updateAlt(){
   const fov=(map.transform&&map.transform.fov?map.transform.fov:36.87)*Math.PI/180;
   const alt=(map.getCanvas().height/2)*mpp/Math.tan(fov/2)/(window.devicePixelRatio||1);
   altChip.textContent="Alt (est): "+fmtAlt(alt);
-  /* street transition offer */
-  streetCheck(z);}
+  /* street transition offer — skip while the polar pane covers the map */
+  if(!aeOpen)streetCheck(z);}
 function applyClutter(){
   const on=cfg.clutter!==false;
   try{map.setLayerZoomRange&&["fires","power-subs"].forEach(id=>map.getLayer(id)&&map.setLayerZoomRange(id,on?3.5:0,24));}catch(e){}
   try{map.getLayer("quakes")&&!map.getFilter("quakes")&&map.setFilter("quakes",on?["any",["<",["zoom"],1e9],[">=",["coalesce",["get","mag"],0],0]]:null);}catch(e){}}
 map.on("load",applyClutter);
-map.on("move",()=>{updateAlt();});map.on("load",updateAlt);
+let altT=0;
+map.on("move",()=>{const t=now();if(t-altT<120)return;altT=t;updateAlt();});map.on("load",updateAlt);
 const streetBtn=document.createElement("button");streetBtn.id="streetBtn";streetBtn.className="hbtn";
 streetBtn.textContent="👁 Street View here";document.getElementById("mapWrap").appendChild(streetBtn);
 streetBtn.addEventListener("click",()=>{const c=map.getCenter();
@@ -2163,14 +2166,21 @@ function openAELab(){
     if(tiltEl&&+tiltEl.value>5){if(el)el.textContent="coordinates readout off while tilted — ⟲ Reset to restore";}
     else{const p=aeInverse((e.clientX-rect.left)*sx,(e.clientY-rect.top)*sx,cv.width/2,cv.height/2,aeR);
       if(el)el.textContent=p?p.lat.toFixed(3)+", "+p.lon.toFixed(3):"drag = pan · scroll = zoom";}});
-  cv.addEventListener("pointerup",()=>drag=false);
+  const release=()=>{drag=false;};
+  cv.addEventListener("pointerup",release);
+  cv.addEventListener("pointercancel",release);
+  cv.addEventListener("lostpointercapture",release);
+  window.addEventListener("pointerup",release);
+  window.addEventListener("blur",release);
   document.getElementById("aeClose").addEventListener("click",()=>setView("globe",{keepCam:true}));
   document.getElementById("aeHome").addEventListener("click",()=>aeGoTo(cfg.home.lat,cfg.home.lon,8.5));
   /* Tilt: a real perspective transform on the plane. Rotation (ORBIT or drag) spins the
      projection CONTENT while the tilt holds — an orbit around a tilted table, not a flat clock.
      Coordinate hover math assumes a flat plane, so it switches off honestly past 5° of tilt. */
   let aeTiltDeg=0;
-  const applyTilt=()=>{cv.style.transform=aeTiltDeg?`rotateX(${aeTiltDeg}deg)`:"";
+  const applyTilt=()=>{ // scale compensates foreshortening so the plane fills the pane instead of clipping
+    const s=aeTiltDeg?(1/Math.cos(aeTiltDeg*Math.PI/180))*0.92+aeTiltDeg/62*0.35:1;
+    cv.style.transform=aeTiltDeg?`rotateX(${aeTiltDeg}deg) scale(${s.toFixed(3)})`:"";
     const co=document.getElementById("aeCoord");
     if(aeTiltDeg>5&&co)co.textContent="coordinates readout off while tilted — ⟲ Reset to restore";};
   document.getElementById("aeTilt").addEventListener("input",e=>{aeTiltDeg=+e.target.value;applyTilt();});
@@ -2198,7 +2208,7 @@ const AE_TILE_URLS={
   sat:z=>(x,y)=>`https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`,
   topo:z=>(x,y)=>`https://tile.opentopomap.org/${z}/${x}/${y}.png`,
   dark:z=>(x,y)=>`https://basemaps.cartocdn.com/dark_all/${z}/${x}/${y}.png`};
-const aeTileCache=new Map();let aeTileFails=0;
+const aeTileCache=new Map();let aeTileFails=0,aeTileGen=0; // gen bumps on every tile arrival → warp cache re-keys
 function aeTile(z,x,y){
   const n=1<<z;x=((x%n)+n)%n;if(y<0||y>=n)return null;
   const key=cfg.basemap+"/"+z+"/"+x+"/"+y;
@@ -2207,7 +2217,7 @@ function aeTile(z,x,y){
   if(aeTileCache.size>220){const k0=aeTileCache.keys().next().value;aeTileCache.delete(k0);}
   const img=new Image();img.crossOrigin="anonymous";
   t={img,ok:false};aeTileCache.set(key,t);
-  img.onload=()=>{t.ok=true;aeTileFails=Math.max(0,aeTileFails-1);aeScheduleDraw();};
+  img.onload=()=>{t.ok=true;aeTileGen++;aeTileFails=Math.max(0,aeTileFails-1);aeScheduleDraw();};
   img.onerror=()=>{aeTileFails++;if(aeTileFails===12)ledger("Polar imagery","",`${cfg.basemap} tiles failing to load — vector fallback active`,"WARN","OFFICIAL","provider limit or offline; the view stays usable");};
   img.src=AE_TILE_URLS[cfg.basemap]?AE_TILE_URLS[cfg.basemap](z)(x,y):AE_TILE_URLS.osm(z)(x,y);
   return t;}
@@ -2229,14 +2239,13 @@ function drawWarpTriangle(g,img,sx0,sy0,sx1,sy1,sx2,sy2,dx0,dy0,dx1,dy1,dx2,dy2)
 let aeWarpCanvas=null,aeWarpKey="";
 function aeDrawImagery(g,cv,cx,cy,R){
   const zEq=Math.log2(R/(cv.height*0.42))+2.2;
-  if(zEq<4.2)return false; // whole-earth polar stays vector — tile counts would explode; stated in the note
-  const tz=Math.max(3,Math.min(17,Math.round(zEq)-1));
-  const key=[cfg.basemap,tz,Math.round(aeTx),Math.round(aeTy),Math.round(R),Math.round(aeRot*10),cv.width,cv.height].join("|");
+  const tz=Math.max(1,Math.min(17,Math.round(zEq)-1)); // scales to 1 at whole-disk: ~8 tiles, no explosion
+  const key=[cfg.basemap,tz,Math.round(aeTx),Math.round(aeTy),Math.round(R),Math.round(aeRot*10),cv.width,cv.height,aeTileGen].join("|");
   if(aeWarpCanvas&&aeWarpKey===key){g.drawImage(aeWarpCanvas,0,0);return true;} // cached warp — pans/zooms rebuild, ticks reuse
   if(!aeWarpCanvas||aeWarpCanvas.width!==cv.width||aeWarpCanvas.height!==cv.height){
     aeWarpCanvas=document.createElement("canvas");aeWarpCanvas.width=cv.width;aeWarpCanvas.height=cv.height;}
   const wg=aeWarpCanvas.getContext("2d");wg.clearRect(0,0,cv.width,cv.height);
-  const NX=16,NY=12;let drew=false;
+  const NX=Math.min(30,Math.max(16,Math.round(cv.width/34))),NY=Math.min(24,Math.max(12,Math.round(cv.height/34)));let drew=false;
   const corner=(i,j)=>{ // screen grid → lat/lon → mercator world px (null = off-disk or polar cap)
     const px=i/NX*cv.width,py=j/NY*cv.height;
     const p=aeInverse(px,py,cx,cy,R);
@@ -2247,8 +2256,13 @@ function aeDrawImagery(g,cv,cx,cy,R){
     const A=grid[j][i],B=grid[j][i+1],C=grid[j+1][i],D=grid[j+1][i+1];
     if(!A||!B||!C||!D)continue;
     // date-line guard: skip cells whose source spans a wrap discontinuity
-    const xs=[A.mx,B.mx,C.mx,D.mx];if(Math.max(...xs)-Math.min(...xs)>256*(1<<tz)/2)continue;
-    const cell=[[A,B,C],[B,D,C]];
+    const worldPx=256*(1<<tz);
+    // cell-local copies: grid corners are shared with neighbor cells and must never be mutated
+    const a={...A},b={...B},c={...C},d={...D};
+    const xs=[a.mx,b.mx,c.mx,d.mx];
+    if(Math.max(...xs)-Math.min(...xs)>worldPx/2){ // straddles the antimeridian — unwrap the copies
+      for(const P of [a,b,c,d])if(P.mx<worldPx/2)P.mx+=worldPx;}
+    const cell=[[a,b,c],[b,d,c]];
     for(const tri of cell){
       const txs=tri.map(p=>Math.floor(p.mx/256)),tys=tri.map(p=>Math.floor(p.my/256));
       for(let tX=Math.min(...txs);tX<=Math.min(...txs)+ (Math.max(...txs)-Math.min(...txs)>1?1:Math.max(...txs)-Math.min(...txs));tX++)
@@ -2272,11 +2286,6 @@ function drawAE(){
   const noteEl=document.getElementById("aeBmNote");
   const vis=(x,y)=>x>-M&&x<W+M&&y>-M&&y<H+M;
   g.fillStyle=th.bg;g.fillRect(0,0,W,H);
-  const imagery=aeDrawImagery(g,cv,cx,cy,R);
-  if(noteEl){const wantNote=imagery
-      ?`${cfg.basemap} — REAL tiles re-projected live · imagery ends at ±85° (Mercator limit)`
-      :(Math.log2(R/(H*0.42))+2.2>=4.2?th.note+" · imagery loading…":"zoom to regional scale for real "+cfg.basemap+" imagery — vector rendering meanwhile");
-    if(noteEl.textContent!==wantNote)noteEl.textContent=wantNote;}
   g.strokeStyle=th.grat;g.lineWidth=1;
   for(let la=60;la>=-90;la-=30){g.beginPath();g.arc(cx+aeTx,cy+aeTy,(90-la)/180*R,0,7);g.stroke();}
   for(let lo=0;lo<360;lo+=30){const[a,b]=aeXY(-90,lo,cx,cy,R);g.beginPath();g.moveTo(cx+aeTx,cy+aeTy);g.lineTo(a,b);g.stroke();}
@@ -2291,9 +2300,14 @@ function drawAE(){
     else if(G.type==="MultiPolygon")G.coordinates.forEach(p=>p.forEach(draw));
     else if(G.type==="LineString")draw(G.coordinates);
     else if(G.type==="MultiLineString")G.coordinates.forEach(draw);}};
-  if(!imagery){g.strokeStyle=th.coast;g.lineWidth=1.2;if(AE_WORLD)drawFC(AE_WORLD);}
+  g.strokeStyle=th.coast;g.lineWidth=1.2;if(AE_WORLD)drawFC(AE_WORLD); // vector base is ALWAYS there — imagery draws over it as tiles arrive, so nothing can ever be black
   const cOn=document.getElementById("aeC");
-  if(!imagery&&AE_COUNTIES&&(!cOn||cOn.checked)&&R>1200){g.strokeStyle=th.county;g.lineWidth=0.7;drawFC(AE_COUNTIES);}
+  if(AE_COUNTIES&&(!cOn||cOn.checked)&&R>1200){g.strokeStyle=th.county;g.lineWidth=0.7;drawFC(AE_COUNTIES);}
+  const imagery=aeDrawImagery(g,cv,cx,cy,R); // real tiles OVER the vector base — arrival is the fade-in
+  if(noteEl){const wantNote=imagery
+      ?`${cfg.basemap} — real tiles re-projected live · sharpening as tiles load · imagery ends at ±85° (Mercator limit)`
+      :`${cfg.basemap} tiles loading — vector base meanwhile`;
+    if(noteEl.textContent!==wantNote)noteEl.textContent=wantNote;}
   /* overlays follow the main Layers panel — one state, two renderers */
   if(LAYERS.faults&&LAYERS.faults.on){
     if(!AE_FAULTS)fetch("faults.geojson").then(r=>r.ok?r.json():null).then(j=>{AE_FAULTS=j;aeScheduleDraw();}).catch(()=>{});
