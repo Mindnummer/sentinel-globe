@@ -68,6 +68,8 @@ h2:first-child{margin-top:0}
 #aeTop{position:absolute;top:6px;left:8px;right:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;
   background:#0a1a14cc;border:1px solid #163026;border-radius:10px;padding:4px 8px;font-size:11px}
 #aeHandoff{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);z-index:41}
+#modeChip{position:absolute;top:6px;left:50%;transform:translateX(-50%);z-index:46;display:none;
+  font-size:10.5px;color:#cfe8dd;background:#0a1a14e0;border:1px solid #2a5a48;border-radius:9px;padding:3px 10px}
 .keyhow{margin:-2px 0 8px;font-size:11px;color:#9fb8ae}
 .keyhow summary{cursor:pointer;color:var(--vir3,#7fe0bd)}
 .keyhow ol{margin:4px 0 4px 18px;line-height:1.5}
@@ -247,6 +249,11 @@ body.focus #mobileNav{display:none!important}
     <button class="hbtn" id="btnAELab">◎ Flat Map (Polar)</button>
     <button class="hbtn" id="btnFollowISS" title="camera locks onto the ISS as it orbits">🛰 Follow ISS <button class="ibtn" data-info="follow">i</button></button>
   </div>
+  <div class="row" style="gap:4px;margin:2px 0">
+    <button class="hbtn" id="rotCCW" title="rotate counterclockwise ([ key)">⟲ CCW</button>
+    <button class="hbtn" id="rotCW" title="rotate clockwise (] key)">⟳ CW</button>
+    <button class="hbtn" id="rotNorth" title="reset orientation to north-up">N↑ Reset</button>
+  </div>
   <div class="finer" style="margin:2px 0">Orbit speed <input type="range" id="orbitSpeed" min="0.2" max="8" step="0.2" value="1" style="width:60%;vertical-align:middle"> <span id="orbitSpeedV">1×</span></div>
   <div class="finer">Performance <button class="hbtn" id="btnPerf" style="padding:2px 8px;font-size:10px">AUTO</button> <button class="ibtn" data-info="perf">i</button>
   </div>
@@ -314,7 +321,7 @@ body.focus #mobileNav{display:none!important}
 <div id="modalBack"><div id="modal"></div></div>
 <script>
 /* ===== SINGLE SOURCE OF TRUTH for the build version — bump ONLY here ===== */
-const APP_VERSION="9.4";
+const APP_VERSION="10.0";
 document.title="Sentinel Globe v"+APP_VERSION+" — Public Telemetry";
 document.addEventListener("DOMContentLoaded",()=>{const v=document.getElementById("verTag");
   if(v)v.textContent="v"+APP_VERSION+" · PUBLIC TELEMETRY";});
@@ -413,7 +420,7 @@ assist:{t:"Sentinel Assistant",w:"A command console over the live state. It read
 feeds:{t:"Feed Status Bar",w:"Live state of every data source. Spinning ring = fetching now. Green dot + age = loaded, showing how old the data is. Red ✕ = last attempt failed. Gray — = off (layer disabled or key missing). Click any chip for details: the exact error, how often it polls, a ↻ Retry button, a link to view the SAME data at the official source website, and honest alternatives for feeds that fail often.",s:"Internal instrumentation of every adapter",f:"Updates the instant any fetch starts or finishes",c:"—",l:"Shows fetch health only — it cannot detect a source returning wrong-but-well-formed data (the Watchdog cross-checks handle that)."},
 faults:{t:"Fault Lines (global)",w:"13,696 mapped active faults worldwide, drawn in red. Click any fault for its name and slip type. A fault on the map means geologists have documented movement there in the geologically recent past — it is NOT a prediction that it will move soon.",s:"GEM Global Active Faults Database (research compilation, CC-BY-SA), vendored in this repo",f:"Static research dataset",c:"MEASURED",l:"Compiled from regional catalogs of varying quality; some regions are mapped in far more detail than others. Simplified to ~1 km precision for speed. Absence of a drawn fault does not mean absence of a fault."},
 flow:{t:"Power Flow Between BAs",w:"Animated lines showing electricity interchange between balancing authorities — which regions are exporting power (line flows away) and which are importing. Line thickness = megawatts. Moving dashes show direction. This is how you SEE the relationships between grid operators: ERCOT is nearly an island; the Eastern and Western interconnections trade constantly.",s:"EIA-930 interchange data (needs your free EIA key)",f:"Hourly, 1–2 h publication lag",c:"MEASURED values, MODELED line positions (region centroids)",l:"The animation represents direction, not literal electron speed. Flows under 25 MW are hidden as noise. Intra-BA flows are not public."},
-traffic:{t:"Road Traffic",w:"Live road congestion painted on the map — green flowing, orange slow, red jammed — down to individual streets when zoomed in. Free TomTom key required (⚙ Key Vault).",s:"TomTom Traffic Flow tiles",f:"Updated continuously by TomTom from GPS probe data",c:"MEASURED",l:"Free tier ≈2,500 tile loads/day — plenty for personal use, and the Watchdog notes if it stops. Relative speeds only; no vehicle counts; no historical replay on the free tier. Coverage best on paved public roads."},
+traffic:{t:"Road Traffic",w:"Live road congestion painted on the map — green flowing, orange slow, red jammed — down to individual streets when zoomed in. Free TomTom key required (⚙ Key Vault).",s:"TomTom Traffic Flow tiles",f:"Updated continuously by TomTom from GPS probe data",c:"MEASURED",l:"Free tier ≈2,500 tile loads/day. IMPORTANT HONESTY: this layer shows aggregate flow speed, NOT individual cars — no public data source anywhere broadcasts individual private vehicles, so this app never will. If the layer shows nothing: no key in the Vault = the layer cannot load (6-step directions are in ⚙ Settings); key present but blank = zoom to city scale, rural roads often have no probe data."},
 ships:{t:"Ships / AIS",w:"Live vessel positions from AIS radio broadcasts, streamed over a websocket for the area you are viewing. Click a ship for name, speed, and course. Free AISStream key required (⚙ Key Vault).",s:"aisstream.io (volunteer terrestrial AIS receivers)",f:"Continuous stream; positions seconds to minutes old",c:"MEASURED",l:"Terrestrial receivers reach ~40 nautical miles offshore — coastal and port coverage is good, open-ocean coverage is NOT (that requires paid satellite AIS). Ships can and do turn transponders off. Capped at 1,500 vessels in memory."},
 sats:{t:"Satellites & Debris",w:"Real orbital objects propagated from published orbits: space stations, weather satellites, Starlink, and cataloged debris from the 2009 Cosmos-2251 collision. Positions recompute every 8 seconds using SGP4 — the same math professionals use.",s:"CelesTrak general-perturbations data; SGP4 via satellite.js (vendored)",f:"Orbits updated by CelesTrak roughly daily; positions recomputed live",c:"MODELED positions from MEASURED orbits — accuracy is km-scale and degrades as the orbit data ages (age shown after loading)",l:"Capped at 400 objects per group so your device stays smooth; the full public catalog is ~27,000 objects. There is NO public live video feed of satellites — anything claiming to be one is an animation, including this one: these are computed positions, honestly labeled."},
 polar_removed_legacy:{t:"(removed)",w:"Globe = the standard 3D Earth. Polar top-down looks straight down at the North Pole — this is exactly the perspective behind the UN emblem and azimuthal-equidistant 'flat' world maps. Seeing it generated live from a sphere is the best teaching tool for why those maps look the way they do: they are projections OF the globe, with distortion growing toward the south.",s:"—",f:"—",c:"—",l:"A true flat azimuthal-equidistant projection is not supported by this map engine; the top-down globe view gives the same visual perspective honestly. Antarctica appears at the outer edge, stretched — that is the projection distorting, not the Earth."},
@@ -480,17 +487,20 @@ async function geocode(q){
       const r=await fetch(`https://api.zippopotam.us/us/${q}`);if(r.ok){const j=await r.json();const p=j.places[0];
       ledger("Zippopotam","api.zippopotam.us","geocoded ZIP "+q,"OK","OFFICIAL","ZIP centroid, not street-level");
       return{name:`${p["place name"]}, ${p["state abbreviation"]} ${q}`,lat:+p.latitude,lon:+p.longitude,z:11.5};}}
-    const r=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=1`);
-    if(r.ok){const j=await r.json();if(j.results&&j.results[0]){const g=j.results[0];
-      ledger("Open-Meteo Geocoder","geocoding-api.open-meteo.com","geocoded "+q,"OK","OFFICIAL","place centroid");
-      return{name:`${g.name}, ${g.admin1||""} ${g.country_code||""}`.trim(),lat:g.latitude,lon:g.longitude,z:10.5};}}
-    // Landmark fallback: "Mount Everest", "Statue of Liberty", "Eiffel Tower"…
+    // Nominatim FIRST for everything that isn't a ZIP/coord: it understands landmarks
+    // ("Statue of Liberty", "Eiffel Tower"), addresses, AND cities, and ranks exact matches on top.
+    // The old order let a cities-only geocoder grab landmark queries and land on the wrong "Liberty".
     const rn=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=jsonv2&limit=1`);
     if(rn.ok){const jn=await rn.json();if(jn[0]){
-      ledger("Nominatim (OSM)","nominatim.openstreetmap.org","geocoded landmark "+q,"OK","OFFICIAL","OSM data; 1 req/s fair-use");
+      ledger("Nominatim (OSM)","nominatim.openstreetmap.org","geocoded "+q+" → "+(jn[0].type||""),"OK","OFFICIAL","OSM data; 1 req/s fair-use");
       const at=jn[0].addresstype||jn[0].type||"";
-      const z=/house|building|amenity|residential|address/.test(at)?17.8:/road|street/.test(at)?16:/suburb|neighbourhood/.test(at)?14:/city|town|village/.test(at)?11.5:/county/.test(at)?9:6.5;
+      const z=/house|building|amenity|attraction|monument|memorial|tower|castle|residential|address/.test(at)?17.2:/road|street/.test(at)?16:/suburb|neighbourhood/.test(at)?14:/city|town|village/.test(at)?11.5:/county/.test(at)?9:6.5;
       return{name:jn[0].display_name.split(",").slice(0,2).join(","),lat:+jn[0].lat,lon:+jn[0].lon,z};}}
+    // fallback only: fuzzy city search
+    const r=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=1`);
+    if(r.ok){const j=await r.json();if(j.results&&j.results[0]){const g=j.results[0];
+      ledger("Open-Meteo Geocoder (fallback)","geocoding-api.open-meteo.com","geocoded "+q,"OK","OFFICIAL","city-level fuzzy match — landmark search already tried");
+      return{name:`${g.name}, ${g.admin1||""} ${g.country_code||""}`.trim(),lat:g.latitude,lon:g.longitude,z:10.5};}}
   }catch(e){ledger("Geocoder","", "failed: "+e.message,"FAIL","UNAVAILABLE","");wd("geocode","bad",e.message);}
   return null;}
 
@@ -507,7 +517,7 @@ const style={
   light:{anchor:"map",intensity:0.4},
   sources:{
     osm:{type:"raster",tiles:["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],tileSize:256,maxzoom:19},
-    sat:{type:"raster",tiles:["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],tileSize:256,maxzoom:19},
+    sat:{type:"raster",tiles:["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],tileSize:256,maxzoom:18},
     topo:{type:"raster",tiles:["https://tile.opentopomap.org/{z}/{x}/{y}.png"],tileSize:256,maxzoom:17},
     dark:{type:"raster",tiles:["https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"],tileSize:256,maxzoom:19},
     satlabels:{type:"raster",tiles:["https://basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}.png"],tileSize:256,maxzoom:19},
@@ -559,6 +569,20 @@ function setBasemap(id){
   if(aeOpen)aeScheduleDraw(); // polar honors the shared basemap state immediately
 }
 document.addEventListener("click",e=>{const b=e.target.closest("[data-bm]");if(b)setBasemap(b.dataset.bm);});
+let tileErrs=0,tileErrT=0,bmFallback=null;
+map.on("error",e=>{
+  const msg=(e&&e.error&&e.error.message)||"";
+  if(!/tile|source|404|Failed to fetch/i.test(msg))return;
+  const t=now();if(t-tileErrT>10000){tileErrs=0;tileErrT=t;}
+  tileErrs++;
+  if(tileErrs===4)ledger("Map tiles","",`repeated tile failures (${esc(msg.slice(0,60))})`,"WARN","OFFICIAL","usually imagery doesn't exist at this zoom here — not an app fault");
+  if(tileErrs>=6&&!bmFallback&&map.getZoom()>15&&(cfg.basemap==="sat"||cfg.basemap==="topo")){
+    bmFallback=cfg.basemap;setBasemap("osm");
+    ledger("Map tiles","",`${bmFallback} unavailable this close here — using street map; your choice restores on zoom-out`,"OK","OFFICIAL","rural satellite often ends at z17-18");
+    if(typeof enrichChip!=="undefined"){enrichChip.style.display="block";
+      enrichChip.textContent="Imagery unavailable at this zoom here — using street map";
+      setTimeout(()=>enrichChip.style.display="none",5000);}}});
+map.on("zoomend",()=>{if(bmFallback&&map.getZoom()<14){setBasemap(bmFallback);bmFallback=null;tileErrs=0;}});
 map.on("load",()=>setBasemap(cfg.basemap||"osm"));
 
 const EMPTY={type:"FeatureCollection",features:[]};
@@ -665,6 +689,7 @@ map.on("load",()=>{
     const pid="acr"+now();
     pop(`<b>${esc(p.cs||p.icao)}</b><br>alt ${p.alt?Math.round(p.alt)+" m":"—"} · ${p.vel?Math.round(p.vel*1.944)+" kt":"—"} · hdg ${p.hdg?Math.round(p.hdg)+"°":"—"}
       <div id="${pid}" style="margin-top:3px;color:#9fb8ae">looking up flight…</div>
+      <button class="hbtn" data-followobj="plane§${esc(p.icao)}§${esc(p.cs||p.icao)}" style="margin-top:3px">◉ Follow</button>
       <span style="color:#8fa69e">ADS-B · MEASURED</span>`,e.lngLat);
     // route + airframe from adsbdb.com — free community db; coverage is partial and it says so
     try{
@@ -680,6 +705,18 @@ map.on("load",()=>{
       if(el)el.innerHTML=html||"route/type not in the public database (common for GA, military, and some cargo)";
       if(html)ledger("adsbdb","api.adsbdb.com","flight lookup "+(p.cs||p.icao),"OK","MEASURED","community route db; partial coverage");
     }catch(err){const el=document.getElementById(pid);if(el)el.textContent="lookup unavailable";}});
+  map.on("click","ships",e=>{const p=e.features[0].properties;
+    pop(`<b>🚢 ${esc(p.name)}</b><br>${p.sog!=null?p.sog+" kt":"—"} · course ${p.cog!=null?Math.round(p.cog)+"°":"—"}
+    <br><button class="hbtn" data-followobj="ship§${esc(p.name)}§${esc(p.name)}" style="margin-top:3px">◉ Follow</button>
+    <br><span style="color:#8fa69e">AIS via AISStream · MEASURED · updates as vessels transmit</span>`,e.lngLat);});
+  map.on("click","sats",e=>{const p=e.features[0].properties;
+    pop(`<b>🛰 ${esc(p.name)}</b><br>${esc(p.grp||"")} · alt ${p.alt} km
+    <br><button class="hbtn" data-followobj="sat§${esc(p.name)}§${esc(p.name)}" style="margin-top:3px">◉ Follow</button>
+    <br><span style="color:#8fa69e">CelesTrak TLE + SGP4 · MODELED from measured orbit</span>`,e.lngLat);});
+  map.on("click","iss",e=>{
+    pop(`<b>🛰 International Space Station</b><br>${S.iss?Math.round(S.iss.alt)+" km · "+Math.round(S.iss.vel)+" km/h":""}
+    <br><button class="hbtn" data-followobj="iss§iss§ISS" style="margin-top:3px">◉ Follow</button>
+    <br><span style="color:#8fa69e">WhereTheISS · MEASURED</span>`,e.lngLat);});
   map.on("click","ba",e=>{const p=e.features[0].properties;
     pulseAt(e.features[0].geometry.coordinates[0],e.features[0].geometry.coordinates[1],p.code);
     pop(`<b>${esc(p.code)}</b> ${esc(p.name)}<br>Demand ${p.d?(+p.d).toLocaleString()+" MWh":"—"}<br>Forecast ${p.df?(+p.df).toLocaleString()+" MWh":"—"}<br>D/F ratio ${p.stress?(+p.stress).toFixed(3):"—"} · hour ${esc(p.period||"")}<br><span style="color:#8fa69e">EIA-930 · hourly, ~1–2 h lag · not real-time SCADA</span>`,e.lngLat);});
@@ -700,10 +737,23 @@ map.on("error",e=>{const m=e&&e.error&&e.error.message||"map error";
 /* ---------- radar loop ---------- */
 let radarPlaying=false, radarFrame=RADAR_FRAMES.length-1, radarTimer=null;
 const radarCount=()=>radarSpanMin>50?radarArchive.length:RADAR_FRAMES.length;
+let radarFadeTimer=null,radarPrev=-1;
+function radarOpacityTarget(){const s=document.getElementById("radarOpacity");return s?+s.value:0.72;}
+function radarCrossfade(prefix,fromI,toI,count){
+  clearInterval(radarFadeTimer);
+  const op=radarOpacityTarget();let step=0,STEPS=6;
+  for(let j=0;j<count;j++){const id=prefix+j;if(!map.getLayer(id))continue;
+    map.setLayoutProperty(id,"visibility",(j===toI||j===fromI)?"visible":"none");
+    if(j!==toI&&j!==fromI)map.setPaintProperty(id,"raster-opacity",0);}
+  radarFadeTimer=setInterval(()=>{step++;const t=step/STEPS;
+    try{
+      if(map.getLayer(prefix+toI))map.setPaintProperty(prefix+toI,"raster-opacity",op*t);
+      if(fromI>=0&&fromI!==toI&&map.getLayer(prefix+fromI))map.setPaintProperty(prefix+fromI,"raster-opacity",op*(1-t));
+    }catch(e){}
+    if(step>=STEPS){clearInterval(radarFadeTimer);
+      if(fromI>=0&&fromI!==toI&&map.getLayer(prefix+fromI))try{map.setLayoutProperty(prefix+fromI,"visibility","none");}catch(e){}}},55);}
 function radarShowLive(i){
-  RADAR_FRAMES.forEach((_,j)=>{if(!map.getLayer("radar"+j))return;
-    map.setLayoutProperty("radar"+j,"visibility",j===i?"visible":"none");
-    map.setPaintProperty("radar"+j,"raster-opacity",j===i?0.72:0);});
+  radarCrossfade("radar",radarPrev,i,RADAR_FRAMES.length);radarPrev=i;
   const back=(RADAR_FRAMES.length-1-i)*5;
   $("radarTime").textContent=back===0?"latest":`now − ${back} min`;}
 /* Archive radar: IEM keeps timestamped US composites (ridge::USCOMP-N0Q-YYYYMMDDHHMM, 5-min steps, years deep).
@@ -1022,6 +1072,38 @@ setInterval(updateIssTrack,60000);map.on("load",()=>setTimeout(updateIssTrack,30
 
 /* ---- Follow ISS: camera locks onto the station, propagated smoothly between fixes ---- */
 let followISS=false,followTimer=null;
+/* ---- Universal follow: ISS, planes (dead-reckoned between fixes), ships, satellites.
+   Cars: individual vehicles are NOT publicly broadcast anywhere — traffic is aggregate flow.
+   That is a fact of the data world, stated here rather than faked. ---- */
+let followTarget=null,followObjTimer=null;
+const followChip=document.createElement("div");followChip.id="followChip";
+followChip.style.cssText="position:absolute;top:6px;right:8px;z-index:46;display:none;font-size:11px;color:#0a1a14;background:#7fd4ff;border-radius:9px;padding:3px 10px;cursor:pointer;font-weight:600";
+document.getElementById("mapWrap").appendChild(followChip);
+followChip.addEventListener("click",()=>stopFollowObj());
+function stopFollowObj(){followTarget=null;clearInterval(followObjTimer);followChip.style.display="none";}
+function followObj(type,id,label){
+  if(type==="iss"){setFollowISS(true);return;}
+  setFollowISS(false);stopFollowObj();
+  if(aeOpen)setView("globe",{keepCam:true});
+  followTarget={type,id,label};
+  followChip.textContent=`Following ${type==="plane"?"✈":type==="ship"?"🚢":"🛰"} ${label} ✕`;
+  followChip.style.display="block";
+  ledger("Follow","",`locked onto ${type} ${label}`,"OK","MEASURED",type==="plane"?"position dead-reckoned between ADS-B fixes (heading × speed)":"position updates at the feed's own cadence");
+  const step=()=>{if(!followTarget)return;let p=null;
+    if(followTarget.type==="plane"){const a=S.aircraft.find(x=>x.icao===followTarget.id);
+      if(a){const dt=Math.min(120,(now()-(FRESH.aircraft||now()))/1000);
+        if(a.vel!=null&&a.hdg!=null){const d=a.vel*dt/111320,r=a.hdg*Math.PI/180;
+          p={lon:a.lon+d*Math.sin(r)/Math.cos(a.lat*Math.PI/180),lat:a.lat+d*Math.cos(r)};}
+        else p={lon:a.lon,lat:a.lat};}}
+    else if(followTarget.type==="ship"){const v=Object.values(S.ships).find(x=>(x.name||("MMSI "+x.mmsi))===followTarget.id);
+      if(v)p={lon:v.lon,lat:v.lat};}
+    else if(followTarget.type==="sat"){const s=S.sats.find(x=>x.name===followTarget.id);
+      if(s)p={lon:s.lon,lat:s.lat};}
+    if(p)map.easeTo({center:[p.lon,p.lat],zoom:Math.max(map.getZoom(),followTarget.type==="sat"?3:7),duration:1900,essential:true});};
+  step();followObjTimer=setInterval(step,2000);}
+document.addEventListener("click",e=>{const f=e.target.closest("[data-followobj]");
+  if(f){const[t,...rest]=f.dataset.followobj.split("§");followObj(t,rest[0],rest[1]||rest[0]);}});
+map.on("dragstart",e=>{if(e&&e.originalEvent&&followTarget)stopFollowObj();});
 function setFollowISS(on){
   if(on&&aeOpen)setView("globe",{keepCam:true}); // follow needs the tile camera — mode switch is automatic and graceful
   followISS=on;$("btnFollowISS").classList.toggle("on",on);
@@ -1720,7 +1802,7 @@ async function doSearch(){const q=$("searchInput").value;if(!q)return;
 let confirmHome=null;
 $("btnGo").addEventListener("click",doSearch);
 $("searchInput").addEventListener("keydown",e=>{if(e.key==="Enter")doSearch();});
-$("btnHome").addEventListener("click",()=>setLocation(cfg.home));
+$("btnHome").addEventListener("click",()=>setLocation({...cfg.home,z:16.8})); // house-level; auto-satellite engages ≥16.6
 $("btnAmbient").addEventListener("click",()=>setAmbient(!S.ambient));
 $("btnIntegrity").addEventListener("click",()=>{S.integrity=!S.integrity;
   $("btnIntegrity").classList.toggle("on",S.integrity);
@@ -1942,9 +2024,26 @@ ledger("Sentinel Globe","","v2 started · MapLibre globe · no telemetry","OK","
 renderLayerList();renderTab();watchdogSweep();
 /* ---- Views: globe / polar top-down (azimuthal perspective, honestly derived from the globe) ---- */
 let viewMode="globe";
+/* ---- Shared orientation. Polar geometry: north at the view center points toward the pole,
+   giving the closed form aeRot = bearing − 180 − lon(center). Exact both directions. ---- */
+function aeSetBearing(bearing,lat,lon){aeRot=((bearing-180-lon)%360+360)%360;aeCenterOn(lat,lon);}
+function aeGetBearing(){const cv=document.getElementById("aeCanvas");if(!cv)return 0;
+  const c=aeInverse(cv.width/2,cv.height/2,cv.width/2,cv.height/2,aeR);
+  return c?(((aeRot+c.lon+180)%360)+360)%360:0;}
+function rotBy(d){
+  if(aeOpen){const cv=document.getElementById("aeCanvas");
+    const c=cv?aeInverse(cv.width/2,cv.height/2,cv.width/2,cv.height/2,aeR):null;
+    aeRot=((aeRot+d)%360+360)%360;if(c)aeCenterOn(c.lat,c.lon);else aeScheduleDraw();}
+  else map.easeTo({bearing:map.getBearing()+d,duration:450});}
+function resetNorth(){
+  if(aeOpen){const cv=document.getElementById("aeCanvas");
+    const c=cv?aeInverse(cv.width/2,cv.height/2,cv.width/2,cv.height/2,aeR):null;
+    if(c)aeSetBearing(0,c.lat,c.lon);}
+  else map.easeTo({bearing:0,duration:500});}
 function setView(mode,opts){
   opts=opts||{};
   const from=viewMode;viewMode=mode;
+  if(mode!=="polar"&&aeLocal)setAELocal(false);
   ["btnViewGlobe","btnViewFlat","btnAELab"].forEach(id=>$(id).classList.remove("on"));
   if(mode!=="polar"&&aeOpen)closeAEPane(!opts.noSync); // leaving polar: sync map to where you were looking
   /* Views are lenses on ONE location. Switching lenses never moves the camera —
@@ -1956,13 +2055,20 @@ function setView(mode,opts){
     try{map.setProjection({type:"mercator"});}catch(e){}
     if(opts.center)map.easeTo({center:opts.center,zoom:opts.zoom||map.getZoom(),duration:1400});}
   if(mode==="polar"){$("btnAELab").classList.add("on");
-    const mc=map.getCenter(),mz=map.getZoom();
-    openAEPane();
-    if(from!=="polar")aeGoTo(mc.lat,mc.lng,mz); // arrive looking at the same place, matching scale
+    const mc=map.getCenter(),mz=map.getZoom(),mb=map.getBearing?map.getBearing():0;
+    if(mz>=12){setAELocal(true);}else{
+      openAEPane();
+      if(from!=="polar"){aeGoTo(mc.lat,mc.lng,mz);aeSetBearing(mb,mc.lat,mc.lng);}}
   }
   ledger("View","",`${from} → ${mode}`,"OK","OFFICIAL",mode==="polar"?"same data, polar projection; exit any time with ✕, Esc, or a view button":"");}
-$("btnViewGlobe").addEventListener("click",()=>setView("globe"));
-$("btnViewFlat").addEventListener("click",()=>setView("flat"));
+$("rotCCW").addEventListener("click",()=>rotBy(-30));
+$("rotCW").addEventListener("click",()=>rotBy(30));
+$("rotNorth").addEventListener("click",resetNorth);
+document.addEventListener("keydown",e=>{
+  if(e.target&&/input|textarea/i.test(e.target.tagName))return;
+  if(e.key==="[")rotBy(-15);if(e.key==="]")rotBy(15);});
+$("btnViewGlobe").addEventListener("click",()=>setView("globe",{keepCam:true}));
+$("btnViewFlat").addEventListener("click",()=>setView("flat",{keepCam:true}));
 $("orbitSpeed").addEventListener("input",e=>{cfg.orbitSpeed=+e.target.value;store.set("orbitSpeed",cfg.orbitSpeed);
   $("orbitSpeedV").textContent=cfg.orbitSpeed.toFixed(1).replace(".0","")+"×";});
 /* ---- PERF modes: AUTO → LOW → HIGH ---- */
@@ -2010,10 +2116,24 @@ function applyClutter(){
 map.on("load",applyClutter);
 let altT=0;
 map.on("move",()=>{const t=now();if(t-altT<120)return;altT=t;updateAlt();});map.on("load",updateAlt);
+const modeChip=document.createElement("div");modeChip.id="modeChip";
+document.getElementById("mapWrap").appendChild(modeChip);
+let aeLocal=false;
+function setAELocal(on){aeLocal=on;
+  modeChip.style.display=on?"block":"none";
+  if(on)modeChip.textContent="POLAR VIEW · local rendering — zoom out to return to the polar projection";
+  $("btnAELab").classList.toggle("on",on||aeOpen);}
+map.on("zoomend",()=>{
+  if(aeLocal&&viewMode==="polar"&&map.getZoom()<7.5){
+    const c=map.getCenter(),z=map.getZoom(),b=map.getBearing?map.getBearing():0;
+    setAELocal(false);openAEPane();aeGoTo(c.lat,c.lng,z);aeSetBearing(b,c.lat,c.lng);
+    ledger("View","","returned to polar projection (your selected view) at zoom-out","OK","OFFICIAL","");}});
 const streetBtn=document.createElement("button");streetBtn.id="streetBtn";streetBtn.className="hbtn";
 streetBtn.textContent="👁 Street View here";document.getElementById("mapWrap").appendChild(streetBtn);
 streetBtn.addEventListener("click",()=>{const c=map.getCenter();
-  window.open(`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${c.lat.toFixed(6)},${c.lng.toFixed(6)}`,"_blank");
+  const url=`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${c.lat.toFixed(6)},${c.lng.toFixed(6)}`;
+  const w=window.open(url,"_blank");
+  if(!w){pop(`<b>Street View</b><br>Your browser blocked the popup.<br><a href="${url}" target="_blank" rel="noopener" style="color:var(--vir3)">Tap to open ground imagery ↗</a>`,c);return;}
   ledger("Street View","google.com/maps","opened ground-level imagery at view center","OK","MEASURED","Google's imagery, opened externally — no free embeddable street-view API exists");});
 let preStreetBasemap=null;
 function streetCheck(z){
@@ -2085,6 +2205,9 @@ function aeInverse(x,y,cx,cy,R){const dx=x-cx-aeTx,dy=y-cy-aeTy,r=Math.hypot(dx,
 function aeScheduleDraw(){try{updateAlt();}catch(e){}
   if(aeDrawQueued)return;aeDrawQueued=true;
   requestAnimationFrame(()=>{aeDrawQueued=false;drawAE();});}
+function aeCenterOn(lat,lon){ // recenter preserving current rotation
+  const r=(90-lat)/180*aeR,t=(lon+aeRot)*Math.PI/180;
+  aeTx=-r*Math.sin(t);aeTy=r*Math.cos(t);aeScheduleDraw();}
 function aeGoTo(lat,lon,z){ // center the polar view on a point; z ~ tile-zoom equivalence
   const cv=document.getElementById("aeCanvas");if(!cv)return;
   aeRot=0;
@@ -2145,15 +2268,13 @@ function openAELab(){
     const mx=(e.clientX-rect.left)*sx,my=(e.clientY-rect.top)*sx;
     aeTx=mx-cv.width/2-(mx-cv.width/2-aeTx)*k;aeTy=my-cv.height/2-(my-cv.height/2-aeTy)*k;
     aeR=Math.max(cv.height*0.35,Math.min(90000,aeR*k));lastInteract=now();
-    if(aeR>=52000&&k>1){ // projection limit — hand off BEFORE quality degrades, never a dead end
+    if(aeR>=52000&&k>1){ // projection limit — switch RENDERING, keep the SELECTED VIEW
       const c=aeInverse(cv.width/2,cv.height/2,cv.width/2,cv.height/2,aeR);
       const zEq=Math.max(1.2,Math.min(19,Math.log2(aeR/(cv.height*0.42))+2.2));
-      setView("globe",{noSync:true,keepCam:true});
-      if(c)map.jumpTo({center:[c.lon,c.lat],zoom:zEq});
-      if(typeof enrichChip!=="undefined"){enrichChip.style.display="block";
-        enrichChip.textContent="Polar projection limit reached — switching to local map view (same spot, same scale)";
-        setTimeout(()=>enrichChip.style.display="none",4500);}
-      ledger("View","","polar → local map auto-handoff at projection limit","OK","OFFICIAL","location, scale, basemap, and layers preserved; ◎ button returns to polar");
+      const brg=aeGetBearing();
+      closeAEPane(false);viewMode="polar";setAELocal(true);
+      if(c)map.jumpTo({center:[c.lon,c.lat],zoom:zEq,bearing:brg});
+      ledger("View","","polar → local rendering at projection limit (still your Polar view; zoom out to return)","OK","OFFICIAL","location, scale, orientation, basemap, layers preserved");
       return;}
     aeScheduleDraw();},{passive:false});
   let drag=false,px=0,py=0;
@@ -2283,6 +2404,10 @@ function drawAE(){
   const cv=document.getElementById("aeCanvas");if(!cv)return;const g=cv.getContext("2d");
   const cx=cv.width/2,cy=cv.height/2,R=aeR,W=cv.width,H=cv.height,M=60;
   const th=AE_THEMES[cfg.basemap]||AE_THEMES.dark;
+  // everything renders inside the projection disk; outside is intentional dark, edge is a crisp ring
+  g.fillStyle="#02090663";g.fillStyle="#020906";g.fillRect(0,0,W,H);
+  const poleX=cx+aeTx,poleY=cy+aeTy,diskR=aeR; // lat −90 maps exactly to radius R
+  g.save();g.beginPath();g.arc(poleX,poleY,diskR,0,7);g.clip();
   const noteEl=document.getElementById("aeBmNote");
   const vis=(x,y)=>x>-M&&x<W+M&&y>-M&&y<H+M;
   g.fillStyle=th.bg;g.fillRect(0,0,W,H);
@@ -2303,7 +2428,7 @@ function drawAE(){
   g.strokeStyle=th.coast;g.lineWidth=1.2;if(AE_WORLD)drawFC(AE_WORLD); // vector base is ALWAYS there — imagery draws over it as tiles arrive, so nothing can ever be black
   const cOn=document.getElementById("aeC");
   if(AE_COUNTIES&&(!cOn||cOn.checked)&&R>1200){g.strokeStyle=th.county;g.lineWidth=0.7;drawFC(AE_COUNTIES);}
-  const imagery=aeDrawImagery(g,cv,cx,cy,R); // real tiles OVER the vector base — arrival is the fade-in
+  const imagery=aeDrawImagery(g,cv,cx,cy,R);
   if(noteEl){const wantNote=imagery
       ?`${cfg.basemap} — real tiles re-projected live · sharpening as tiles load · imagery ends at ±85° (Mercator limit)`
       :`${cfg.basemap} tiles loading — vector base meanwhile`;
@@ -2349,10 +2474,15 @@ function drawAE(){
     g.beginPath();g.arc(qx,qy,8+30*ph,0,7);g.stroke();g.globalAlpha=1;
     setTimeout(aeScheduleDraw,80);}
   g.fillStyle="#6b8078";g.font="10px sans-serif";
+  g.restore(); // close the disk clip
+  g.strokeStyle="#2a5a48";g.lineWidth=1.5;
+  g.beginPath();g.arc(poleX,poleY,diskR,0,7);g.stroke(); // intentional edge — the projection's true boundary
+  g.fillStyle="#6b8078";g.font="10px sans-serif";
   g.fillText("North-polar azimuthal equidistant · "+((BASEMAPS[cfg.basemap]||{}).attrib||"Natural Earth")+" · US Census · live data"+(LAYERS.radar&&LAYERS.radar.on?"  ·  radar loop not re-projectable here — use Globe/Flat World":""),8,H-6);
   const ho=document.getElementById("aeHandoff");
   if(ho)ho.style.display=R>22000?"block":"none";}
 document.addEventListener("click",e=>{if(e.target.closest("#btnAELab")){
+  if(aeLocal){setAELocal(false);viewMode="globe";$("btnAELab").classList.remove("on");return;}
   aeOpen?setView("globe",{keepCam:true}):setView("polar");}});
 
 /* ---- boot: bookmarks, presets, startup profile ---- */
