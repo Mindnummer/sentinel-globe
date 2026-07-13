@@ -321,7 +321,7 @@ body.focus #mobileNav{display:none!important}
 <div id="modalBack"><div id="modal"></div></div>
 <script>
 /* ===== SINGLE SOURCE OF TRUTH for the build version — bump ONLY here ===== */
-const APP_VERSION="10.0";
+const APP_VERSION="10.1";
 document.title="Sentinel Globe v"+APP_VERSION+" — Public Telemetry";
 document.addEventListener("DOMContentLoaded",()=>{const v=document.getElementById("verTag");
   if(v)v.textContent="v"+APP_VERSION+" · PUBLIC TELEMETRY";});
@@ -560,7 +560,7 @@ const BASEMAPS={
   dark:{label:"Dark",layers:["dark"],attrib:"© CARTO © OpenStreetMap contributors"},
 };
 function setBasemap(id){
-  cfg.basemap=id;store.set("basemap",id);
+  cancelFollowSafe("overlay change");cfg.basemap=id;store.set("basemap",id);
   const active=BASEMAPS[id].layers;
   ["osm","sat","topo","dark","satlabels"].forEach(l=>map.getLayer(l)&&
     map.setLayoutProperty(l,"visibility",active.includes(l)?"visible":"none"));
@@ -800,7 +800,7 @@ function radarPlay(on){
 let ambientRAF=null,lastInteract=0,userBusy=false;
 // FIX: track interaction END, not just start — trackpad inertia used to re-arm the pause forever.
 ["dragstart","zoomstart","rotatestart","pitchstart"].forEach(ev=>map.on(ev,e=>{if(e&&e.originalEvent){userBusy=true;lastInteract=now();}}));
-map.on("click",e=>{if(e&&e.originalEvent)lastInteract=now()+12000;}); // clicking a marker holds ORBIT still for ~15 s — the world must not drift away from what you just selected
+map.on("click",e=>{if(e&&e.originalEvent){lastInteract=now()+12000;cancelFollowSafe("selection");}}); // clicking a marker holds ORBIT still for ~15 s — the world must not drift away from what you just selected
 ["dragend","zoomend","rotateend","pitchend"].forEach(ev=>map.on(ev,e=>{if(e&&e.originalEvent){userBusy=false;lastInteract=now();}}));
 function ambientTick(){
   if(!S.ambient){ambientRAF=null;return;}
@@ -1081,10 +1081,18 @@ followChip.style.cssText="position:absolute;top:6px;right:8px;z-index:46;display
 document.getElementById("mapWrap").appendChild(followChip);
 followChip.addEventListener("click",()=>stopFollowObj());
 function stopFollowObj(){followTarget=null;clearInterval(followObjTimer);followChip.style.display="none";}
+function cancelFollowSafe(r){try{cancelFollow(r);}catch(e){}} // callable before follow system initializes
+let navSuppress=false; // guards Follow's own programmatic view-switch from self-cancelling
+function cancelFollow(reason){ // ANY intentional user navigation clears every follow lock
+  if(navSuppress)return;
+  const had=(followTarget&&followTarget.label)||(typeof followISS!=="undefined"&&followISS?"ISS":null);
+  if(!had)return;
+  stopFollowObj();try{setFollowISS(false);}catch(e){}
+  ledger("Follow","",`released — ${reason||"user took control"}`,"OK","OFFICIAL","your latest command always outranks the autopilot");}
 function followObj(type,id,label){
   if(type==="iss"){setFollowISS(true);return;}
   setFollowISS(false);stopFollowObj();
-  if(aeOpen)setView("globe",{keepCam:true});
+  if(aeOpen){navSuppress=true;setView("globe",{keepCam:true});navSuppress=false;}
   followTarget={type,id,label};
   followChip.textContent=`Following ${type==="plane"?"✈":type==="ship"?"🚢":"🛰"} ${label} ✕`;
   followChip.style.display="block";
@@ -1103,9 +1111,10 @@ function followObj(type,id,label){
   step();followObjTimer=setInterval(step,2000);}
 document.addEventListener("click",e=>{const f=e.target.closest("[data-followobj]");
   if(f){const[t,...rest]=f.dataset.followobj.split("§");followObj(t,rest[0],rest[1]||rest[0]);}});
-map.on("dragstart",e=>{if(e&&e.originalEvent&&followTarget)stopFollowObj();});
+["dragstart","zoomstart","rotatestart","pitchstart"].forEach(ev=>map.on(ev,e=>{if(e&&e.originalEvent)cancelFollow("manual "+ev.replace("start",""));}));
 function setFollowISS(on){
-  if(on&&aeOpen)setView("globe",{keepCam:true}); // follow needs the tile camera — mode switch is automatic and graceful
+  if(on&&followTarget)stopFollowObj();
+  if(on&&aeOpen){navSuppress=true;setView("globe",{keepCam:true});navSuppress=false;} // follow needs the tile camera — mode switch is automatic and graceful
   followISS=on;$("btnFollowISS").classList.toggle("on",on);
   clearInterval(followTimer);
   if(on){
@@ -1788,7 +1797,7 @@ $("btnFocus").addEventListener("click",()=>{
 /* =====================================================================
    LOCATION + UI WIRES
    ===================================================================== */
-function setLocation(loc,fly=true){S.loc=loc;
+function setLocation(loc,fly=true){cancelFollowSafe("navigated to "+(loc.name||"location"));S.loc=loc;
   if(fly){if(aeOpen)aeGoTo(loc.lat,loc.lon,loc.z||8.6);
     else map.flyTo({center:[loc.lon,loc.lat],zoom:loc.z||8.6,duration:2600});}
   ledger("Location","",'focused: '+loc.name,"OK","OFFICIAL","");
@@ -1802,7 +1811,7 @@ async function doSearch(){const q=$("searchInput").value;if(!q)return;
 let confirmHome=null;
 $("btnGo").addEventListener("click",doSearch);
 $("searchInput").addEventListener("keydown",e=>{if(e.key==="Enter")doSearch();});
-$("btnHome").addEventListener("click",()=>setLocation({...cfg.home,z:16.8})); // house-level; auto-satellite engages ≥16.6
+$("btnHome").addEventListener("click",()=>setLocation({...cfg.home,z:17.5})); // exact saved coords, house-level; Follow cancels via setLocation // house-level; auto-satellite engages ≥16.6
 $("btnAmbient").addEventListener("click",()=>setAmbient(!S.ambient));
 $("btnIntegrity").addEventListener("click",()=>{S.integrity=!S.integrity;
   $("btnIntegrity").classList.toggle("on",S.integrity);
@@ -1902,7 +1911,8 @@ $("btnSettings").addEventListener("click",()=>{
     store.set("customKeys",ck);
     if(!cfg.nasaKey)cfg.nasaKey="DEMO_KEY",store.set("nasaKey","DEMO_KEY");
     const hq=$("setHome").value.trim();
-    if(hq){const loc=await geocode(hq);if(loc){cfg.home=loc;store.set("home",loc);}}
+    if(hq){const loc=await geocode(hq);if(loc){cfg.home=loc;store.set("home",loc);
+      ledger("Home","",`saved: ${loc.name} @ ${loc.lat.toFixed(6)}, ${loc.lon.toFixed(6)}`,"OK","OFFICIAL","full precision stored; if Home lands off-target, re-enter the street address — the geocoder was upgraded in v10 and old saves may carry an old fix");}}
     $("modalBack").classList.remove("open");
     ledger("Settings","","saved — keys stored locally only","OK","OFFICIAL","");
     renderLayerList();runAll(true);});});
@@ -2030,7 +2040,7 @@ function aeSetBearing(bearing,lat,lon){aeRot=((bearing-180-lon)%360+360)%360;aeC
 function aeGetBearing(){const cv=document.getElementById("aeCanvas");if(!cv)return 0;
   const c=aeInverse(cv.width/2,cv.height/2,cv.width/2,cv.height/2,aeR);
   return c?(((aeRot+c.lon+180)%360)+360)%360:0;}
-function rotBy(d){
+function rotBy(d){cancelFollowSafe("manual rotation");
   if(aeOpen){const cv=document.getElementById("aeCanvas");
     const c=cv?aeInverse(cv.width/2,cv.height/2,cv.width/2,cv.height/2,aeR):null;
     aeRot=((aeRot+d)%360+360)%360;if(c)aeCenterOn(c.lat,c.lon);else aeScheduleDraw();}
@@ -2041,7 +2051,7 @@ function resetNorth(){
     if(c)aeSetBearing(0,c.lat,c.lon);}
   else map.easeTo({bearing:0,duration:500});}
 function setView(mode,opts){
-  opts=opts||{};
+  opts=opts||{};cancelFollowSafe("view switch");
   const from=viewMode;viewMode=mode;
   if(mode!=="polar"&&aeLocal)setAELocal(false);
   ["btnViewGlobe","btnViewFlat","btnAELab"].forEach(id=>$(id).classList.remove("on"));
@@ -2278,16 +2288,40 @@ function openAELab(){
       return;}
     aeScheduleDraw();},{passive:false});
   let drag=false,px=0,py=0;
-  cv.addEventListener("pointerdown",e=>{drag=true;px=e.clientX;py=e.clientY;lastInteract=now();cv.setPointerCapture(e.pointerId);});
+  const ptrs=new Map();let rotDrag=null,pinch0=null;
+  cv.addEventListener("contextmenu",e=>e.preventDefault());
+  cv.addEventListener("pointerdown",e=>{
+    cancelFollowSafe("gesture");lastInteract=now();cv.setPointerCapture(e.pointerId);
+    ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(ptrs.size===2){ // two fingers: pinch = zoom, twist = rotate — same language as the tile views
+      const[a,b]=[...ptrs.values()];
+      pinch0={d:Math.hypot(a.x-b.x,a.y-b.y),ang:Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI,R:aeR,rot:aeRot,
+        c:aeInverse(cv.width/2,cv.height/2,cv.width/2,cv.height/2,aeR)};
+      drag=false;return;}
+    if(e.button===2){ // right-drag rotates, exactly like globe and flat world
+      rotDrag={x0:e.clientX,rot0:aeRot,c:aeInverse(cv.width/2,cv.height/2,cv.width/2,cv.height/2,aeR)};return;}
+    drag=true;px=e.clientX;py=e.clientY;});
   cv.addEventListener("pointermove",e=>{
     const rect=cv.getBoundingClientRect(),sx=cv.width/rect.width;
+    if(ptrs.has(e.pointerId))ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pinch0&&ptrs.size===2){const[a,b]=[...ptrs.values()];
+      const d=Math.hypot(a.x-b.x,a.y-b.y),ang=Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI;
+      aeR=Math.max(cv.height*0.35,Math.min(90000,pinch0.R*(d/Math.max(20,pinch0.d))));
+      aeRot=((pinch0.rot+(ang-pinch0.ang))%360+360)%360;
+      if(pinch0.c)aeCenterOn(pinch0.c.lat,pinch0.c.lon);else aeScheduleDraw();
+      lastInteract=now();return;}
+    if(rotDrag){aeRot=((rotDrag.rot0+(e.clientX-rotDrag.x0)*0.35)%360+360)%360;
+      if(rotDrag.c)aeCenterOn(rotDrag.c.lat,rotDrag.c.lon);else aeScheduleDraw();
+      lastInteract=now();return;}
     if(drag){aeTx+=(e.clientX-px)*sx;aeTy+=(e.clientY-py)*sx;px=e.clientX;py=e.clientY;lastInteract=now();aeScheduleDraw();}
     const el=document.getElementById("aeCoord");
     const tiltEl=document.getElementById("aeTilt");
     if(tiltEl&&+tiltEl.value>5){if(el)el.textContent="coordinates readout off while tilted — ⟲ Reset to restore";}
     else{const p=aeInverse((e.clientX-rect.left)*sx,(e.clientY-rect.top)*sx,cv.width/2,cv.height/2,aeR);
       if(el)el.textContent=p?p.lat.toFixed(3)+", "+p.lon.toFixed(3):"drag = pan · scroll = zoom";}});
-  const release=()=>{drag=false;};
+  const release=e=>{drag=false;rotDrag=null;
+    if(e&&e.pointerId!=null)ptrs.delete(e.pointerId);else ptrs.clear();
+    if(ptrs.size<2)pinch0=null;};
   cv.addEventListener("pointerup",release);
   cv.addEventListener("pointercancel",release);
   cv.addEventListener("lostpointercapture",release);
@@ -2357,12 +2391,21 @@ function drawWarpTriangle(g,img,sx0,sy0,sx1,sy1,sx2,sy2,dx0,dy0,dx1,dy1,dx2,dy2)
         dd=(sx0*(dy1-dy2)+sx1*(dy2-dy0)+sx2*(dy0-dy1))/-d*-1,
         e=dx0-a*sx0-c*sy0,f=dy0-b*sx0-dd*sy0;
   g.transform(a,b,c,dd,e,f);g.drawImage(img,0,0);g.restore();}
-let aeWarpCanvas=null,aeWarpKey="";
+let aeWarpCanvas=null,aeWarpKey="",aeWarpMeta=null,aeSettleT=null;
 function aeDrawImagery(g,cv,cx,cy,R){
   const zEq=Math.log2(R/(cv.height*0.42))+2.2;
   const tz=Math.max(1,Math.min(17,Math.round(zEq)-1)); // scales to 1 at whole-disk: ~8 tiles, no explosion
   const key=[cfg.basemap,tz,Math.round(aeTx),Math.round(aeTy),Math.round(R),Math.round(aeRot*10),cv.width,cv.height,aeTileGen].join("|");
-  if(aeWarpCanvas&&aeWarpKey===key){g.drawImage(aeWarpCanvas,0,0);return true;} // cached warp — pans/zooms rebuild, ticks reuse
+  if(aeWarpCanvas&&aeWarpKey===key){g.drawImage(aeWarpCanvas,0,0);return true;}
+  // Mid-gesture: blit the last warp transformed (scale about the pole + pan delta) — buttery while
+  // interacting; the exact rebuild happens 160 ms after the hand settles.
+  if(aeWarpCanvas&&aeWarpMeta&&aeWarpMeta.rot===Math.round(aeRot*10)&&now()-lastInteract<400){
+    const kS=R/aeWarpMeta.R;
+    const poleN={x:cx+aeTx,y:cy+aeTy},poleO={x:aeWarpMeta.cx+aeWarpMeta.tx,y:aeWarpMeta.cy+aeWarpMeta.ty};
+    g.save();g.translate(poleN.x,poleN.y);g.scale(kS,kS);g.translate(-poleO.x,-poleO.y);
+    g.drawImage(aeWarpCanvas,0,0);g.restore();
+    clearTimeout(aeSettleT);aeSettleT=setTimeout(aeScheduleDraw,160);
+    return true;}
   if(!aeWarpCanvas||aeWarpCanvas.width!==cv.width||aeWarpCanvas.height!==cv.height){
     aeWarpCanvas=document.createElement("canvas");aeWarpCanvas.width=cv.width;aeWarpCanvas.height=cv.height;}
   const wg=aeWarpCanvas.getContext("2d");wg.clearRect(0,0,cv.width,cv.height);
@@ -2393,7 +2436,8 @@ function aeDrawImagery(g,cv,cx,cy,R){
           tri[0].mx-tX*256,tri[0].my-tY*256,tri[1].mx-tX*256,tri[1].my-tY*256,tri[2].mx-tX*256,tri[2].my-tY*256,
           tri[0].px,tri[0].py,tri[1].px,tri[1].py,tri[2].px,tri[2].py);
         drew=true;}}}
-  if(drew){aeWarpKey=key;g.drawImage(aeWarpCanvas,0,0);return true;}
+  if(drew){aeWarpKey=key;aeWarpMeta={R,tx:aeTx,ty:aeTy,cx,cy,rot:Math.round(aeRot*10)};
+    g.drawImage(aeWarpCanvas,0,0);return true;}
   return false;}
 const AE_THEMES={ // the polar view honors your basemap choice as far as a vector renderer honestly can
   osm:{bg:"#f2efe9",coast:"#4a6a58",county:"#b9c9c0",grat:"#d8d2c6",note:"street basemap (vector rendering)"},
