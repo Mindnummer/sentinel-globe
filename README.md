@@ -1,122 +1,69 @@
-# SENTINEL GLOBE v1.0
+# Sentinel Globe v10.1.2
 
-**Public-telemetry command center — single file, no build step, no server, no telemetry.**
+**Source-transparent public telemetry and weather situational-awareness command center.**
 
-One file (`index.html`) contains the entire app: a 3D-style rotating globe + 2D map, location
-search, 11 live public-data adapters, a Watchdog integrity panel, a Truth Ledger, a rule-based
-anomaly engine, Mock Mode (unmistakably labeled), and Integrity Mode.
+Sentinel Globe is a static browser application built for GitHub Pages. It combines a MapLibre globe/flat map, a custom north-polar renderer, public weather and earth-data feeds, grid telemetry, aircraft/ship/satellite layers, a Watchdog, a Truth Ledger, and deterministic anomaly rules.
 
----
+## Active deployment bundle
 
-## Why this is one HTML file instead of React + Node
+The live app requires these files in the repository root:
 
-The original spec suggested React/TypeScript/Vite + a Node backend. I deliberately chose the
-simpler architecture, for reasons that fit how you actually deploy:
+- `index.html` — application and interface
+- `maplibre-gl.js`, `maplibre-gl.css`, `MAPLIBRE-LICENSE.txt` — vendored MapLibre GL
+- `satellite.min.js` — vendored SGP4 propagation library
+- `counties.geojson`, `faults.geojson`, `world.geojson` — local geometry datasets
+- `manifest.webmanifest`, `sentinel-icon-192.png`, `sentinel-icon-512.png` — install metadata and icons
+- `.nojekyll` — prevents GitHub Pages from processing the static bundle through Jekyll
 
-1. **GitHub Pages cannot run a backend.** A Node server would require paid hosting, keys
-   management, and maintenance. Every data source used here supports direct browser access
-   (CORS), so no proxy server is needed.
-2. **No build step = no Node.js, no npm, no Vite, nothing to break.** Upload one file, done.
-   This is the same architecture as Selah and SPECTRUM·SIGNAL, which you already deploy successfully.
-3. **Auditable.** One readable file. Anyone can View Source and verify there is no tracking,
-   no hidden calls, no secrets.
+Historical builds are retained under `archive/`; they are not loaded by the live application.
 
-Trade-off stated honestly: API keys you enter (FIRMS, EIA) are stored in **your browser's
-localStorage only** — they never leave your machine and are never in the GitHub repo. That is
-acceptable for personal keys on a personal tool. It would NOT be acceptable for paid/secret
-keys on a public product; that is what the Phase 2 proxy is for (see ROADMAP).
+## What v10.1.2 currently does
 
----
+- Globe, Mercator flat-world, and north-polar azimuthal views
+- Street, satellite, terrain, and dark basemaps
+- NEXRAD composite radar loop with archive spans
+- NWS alerts and measured NWS station observations
+- Open-Meteo model nowcast, hourly forecast, and seven-day forecast
+- USGS earthquakes and regional 30-day enrichment
+- NASA FIRMS thermal detections with a user-supplied key
+- NOAA SWPC solar wind, IMF Bz/Bt, Kp, and GOES X-ray feeds
+- NASA DONKI notices
+- ISS position, ground track, and smooth SGP4 follow mode
+- Optional aircraft, AIS ship, satellite/debris, traffic, grid-demand, grid-flow, power-infrastructure, county, and fault layers
+- Watchdog, feed-status bar, Truth Ledger, source registry, anomaly engine, bookmarks, presets, backups, and journal
 
-## What works LIVE with zero keys (out of the box)
+## Confidence vocabulary
 
-| Layer | Source | Confidence label |
-|---|---|---|
-| Earthquakes (hour/day/week/30d) | USGS GeoJSON feeds | MEASURED |
-| US Weather Alerts (point + national) | NWS api.weather.gov | OFFICIAL |
-| Local conditions (temp/wind/precip) | Open-Meteo | MEASURED |
-| Space weather: Kp index | NOAA SWPC | MEASURED |
-| Space weather: solar wind (DSCOVR) | NOAA SWPC | MEASURED |
-| Space weather: GOES X-ray / flare class | NOAA SWPC | MEASURED |
-| Solar events (flares, CMEs, storms) | NASA DONKI (DEMO_KEY) | OFFICIAL |
-| ISS live position | WhereTheISS.at | MEASURED |
-| Aircraft near your location | OpenSky Network (anonymous, rate-limited) | MEASURED |
-| Moon phase / illumination / day-night terminator | Computed locally | MODELED |
-| Geocoding (ZIP / city / coords) | Zippopotam + Open-Meteo geocoder | OFFICIAL |
+- **OFFICIAL** — an official alert or published operational product
+- **MEASURED** — instrument or observation data
+- **MODELED** — forecast, propagation, geometry, or computed inference
+- **EXPERIMENTAL** — useful but not yet reliable enough for ordinary operational use
+- **MOCK** — sample data, always visibly labeled
+- **UNAVAILABLE** — no trustworthy value was obtained
 
-## What needs a free key (Settings ⚙ button in the app)
+Open-Meteo “current” values are correctly labeled **MODELED**. NWS station observations are the measured weather row when available.
 
-- **NASA FIRMS fires** — free MAP_KEY from https://firms.modaps.eosdis.nasa.gov/api/ (works without it in Mock Mode only, clearly labeled).
-- **EIA-930 grid demand** — free key from https://www.eia.gov/opendata/register.php (ERCOT region pre-selected; TEX/CAL/MISO/PJM/etc. selectable).
-- **NASA DONKI** — ships with `DEMO_KEY` (low rate limit); free upgrade at https://api.nasa.gov.
+## Deploy to GitHub Pages
 
-## What is honestly NOT included (and why)
+1. Back up the current repository.
+2. Upload every file and folder from this release ZIP to the repository root, replacing matching files.
+3. In GitHub, open **Settings → Pages**.
+4. Select **Deploy from a branch**, branch **main**, folder **/(root)**.
+5. Wait for the Pages deployment to finish, then open the site and press **Ctrl+Shift+R** once.
+6. Follow `DEPLOYMENT_CHECKLIST.md` before treating the release as verified.
 
-- **Schumann resonance**: shown GRAY / experimental. There is currently **no reliable public
-  keyless Schumann API**. The app says so instead of faking one. Adapter slot exists for Phase 2.
-- **Satellite pass predictions (SGP4)**: needs an orbital propagation library; Phase 2.
-  ISS *position* is live; *pass predictions* are not.
-- **Radar imagery tiles, lightning, tides, flood gauges, volcano feeds**: Phase 2 (see ROADMAP.md).
-- **Grid frequency / reserve margin / private topology**: not public; will never be claimed.
+Do not upload API keys into GitHub. Keys entered through Settings are stored in that browser’s `localStorage` and transmitted only to the provider whose adapter uses them. Browser storage is not encrypted; do not use valuable secret credentials here.
 
----
+## Verification
 
-# HOW TO PUT THIS ON GITHUB — STEP BY STEP (assume nothing)
+Run the dependency-free static audit from the repository root:
 
-You already have the account **mindnummer** on github.com. These steps mirror how Selah was deployed.
+```bash
+python tests/static_audit.py
+```
 
-### Part 1 — Create the repository
-1. Go to **https://github.com** and sign in.
-2. Click the **green "New"** button (left side), or go to https://github.com/new.
-3. In **Repository name**, type exactly: `sentinel-globe` (all lowercase — capitalization
-   mismatches have caused you Pages problems before; lowercase avoids the whole issue).
-4. Leave it **Public**. Do NOT check any of the "initialize" boxes.
-5. Click the green **Create repository** button.
+Then perform the real-browser checklist. Static analysis cannot prove that every external provider is reachable, correctly handling CORS, or returning the same schema today.
 
-### Part 2 — Upload the app
-6. On the new empty repo page, click the link that says **"uploading an existing file"**.
-7. Drag **`index.html`** (and this `README.md`, and the `docs` folder if you want) into the box.
-   ⚠ The file must be named exactly `index.html` — all lowercase — or Pages will show 404.
-8. Scroll down and click the green **Commit changes** button.
+## Architecture direction
 
-### Part 3 — Turn on GitHub Pages
-9. Click the **Settings** tab (top of the repo, gear icon).
-10. In the left sidebar, click **Pages**.
-11. Under **Build and deployment → Source**, choose **Deploy from a branch**.
-12. Under **Branch**, choose **main**, folder **/ (root)**, then click **Save**.
-13. Wait 1–3 minutes. Refresh the page. A box appears at the top:
-    **"Your site is live at https://mindnummer.github.io/sentinel-globe/"**
-14. Click that link. Sentinel Globe is now running.
-
-### Part 4 — First use
-15. Type your ZIP code (e.g., `76234`) in the search box, press Enter.
-16. Right panel fills with your Local Brief. Bottom tabs: **Alerts · Anomalies · Ledger · Watchdog**.
-17. Click **⚙ Settings** to paste your free FIRMS / EIA keys (stored in your browser only).
-18. Click **MOCK** in the header to see the sample-data demo — a large orange banner makes
-    it impossible to confuse with live data. Click again to return to live.
-19. Click **INTEGRITY** to hide anything that is mock, experimental, or low-confidence.
-
-### Updating later
-Edit → repo page → click `index.html` → pencil icon (✏) → paste new version → Commit changes.
-Pages redeploys automatically in ~1 minute. **The GitHub copy is the single source of truth** —
-don't keep divergent copies on other machines.
-
----
-
-## Testing done before delivery
-A headless smoke test (jsdom, Node) booted the full app with canned API responses and verified:
-zero script errors; geocode → Local Brief for Decatur TX; anomaly engine produced 5 correctly-worded
-findings; mock/integrity toggles; watchdog 14 checks; ledger writes; Kp/solar-wind/X-ray parsing;
-quake and ISS rendering. Live-API behavior should still be eyeballed in a real browser after deploy —
-the harness cannot test real network conditions, and I won't claim it can.
-
-## Existing open-source projects worth knowing (your "save time" question)
-I searched for a ready-made equivalent; nothing public combines these layers with an integrity
-ledger, so the single file was built fresh. But these are proven building blocks for Phase 2+:
-- **satellite.js** (github.com/shashwatak/satellite-js) — SGP4 propagation for real pass predictions.
-- **CesiumJS** (cesium.com) — true 3D WebGL globe if you outgrow the canvas renderer.
-- **MapLibre GL** — vector maps with globe projection, still no server needed.
-- **NASA Open MCT** (github.com/nasa/openmct) — NASA's open-source mission-control framework;
-  heavyweight, but the gold standard if Sentinel Globe ever becomes a multi-user product.
-
-Soli Deo Gloria.
+The static architecture remains appropriate for a personal, transparent dashboard. The planned lightning, storm-cell, historical replay, and background-alert system will require a small trusted backend because raw lightning/radar products need conversion, durable history, and secret-safe provider access. See `ROADMAP.md`.

@@ -1,41 +1,47 @@
-# Sentinel Globe — Roadmap
+# Sentinel Globe — Truth-First Roadmap
 
-## Phase 1 (DELIVERED — v1.0, single file)
-Globe/2D map · location search · 11 live adapters · moon/terminator · Local Brief ·
-rule-based anomaly engine with honest wording · Watchdog (14 checks) · Truth Ledger ·
-Mock Mode (banner-labeled) · Integrity Mode · localStorage snapshots + "What changed" ·
-settings for free keys (browser-local only).
+## Release 10.1.2 — stabilization delivered
 
-## Phase 2 — deeper data, still no server required
-Ordered by value-per-effort:
-1. **SGP4 pass predictions** — add satellite.js (single script include keeps the no-build rule);
-   CelesTrak GP data; ISS/Starlink/NOAA-sat passes with "TLE age" and propagation-confidence labels.
-2. **NEXRAD radar overlay** — Iowa State Mesonet public tile service (no key) drawn on the 2D map.
-3. **Air quality** — AirNow (free key) or Open-Meteo air-quality endpoint (no key).
-4. **NOAA storm reports, tsunami (tsunami.gov), volcano (USGS VNS)** feeds.
-5. **River/flood gauges** — USGS Water Services (no key).
-6. **Watch Zones** — named saved locations with per-zone thresholds and mute rules (localStorage).
-7. **Richer history** — IndexedDB instead of localStorage; 30-day replay slider.
-8. **Muted Ledger + rule builder** — "only tell me if it matters" rules, inspectable, never silent deletion.
-9. **Schumann adapter** — manual-entry panel + adapter slot for any station that publishes data;
-   stays EXPERIMENTAL-labeled; no medical/spiritual/prediction claims, ever.
+- Corrected EIA power-flow geometry and grid-anomaly navigation coordinates
+- Restored saved basemap, orbit-speed, and performance preferences
+- Validated saved/imported coordinates and basemap values
+- Corrected modeled-versus-measured weather labeling
+- Removed duplicate IDs, duplicate help key behavior, invalid nested buttons, dead Polar help, and invalid Watchdog states
+- Removed obsolete v2 boot metadata and misleading search instructions
+- Added proper install icons, `.nojekyll`, current documentation, a static audit, deployment checklist, and release notes
 
-## Phase 3 — the Adaptive Visualization + Investigation Workspace (second spec document)
-This is genuinely a larger product and would outgrow one file. Honest recommendation:
-1. Move to **MapLibre GL or CesiumJS** for a true WebGL globe with layer compositing.
-2. **Dashboard grid engine** (drag/resize/save presets: North Texas Watch, Grid+Weather,
-   TV Wall, Investigation Mode, etc.) — golden-layout or gridstack.js are proven OSS options.
-3. **Investigation Mode + Evidence Ledger** — historical queries need real storage:
-   a small always-on collector (Raspberry Pi or your Proxmox box) writing to
-   **PostgreSQL + TimescaleDB + PostGIS**, exactly as the spec suggested. Browser-only apps
-   cannot see the past before you opened them; a collector can. This is the single biggest
-   unlock for "what happened last week in New York" questions.
-4. **Sentinel Assistant** — command parser first (deterministic: mute/filter/layout/replay verbs),
-   optional LLM layer later, hard-bound to the Evidence Ledger so it cannot invent facts.
-5. **Correlation matrix / event-chain views** — labeled correlation-only, built on the
-   TimescaleDB history.
+## Next release — Weather Core
 
-## Standing integrity rules (all phases)
-No faked data · no unlabeled mock · no certainty language outside official alerts ·
-no private-infrastructure claims · no scanning/probing capability · every alert traceable
-in the ledger · "what would increase confidence" attached to every hypothesis.
+Highest-value work before adding more unrelated telemetry:
+
+1. **Unified weather timeline** — one scrubber controlling radar, lightning, alerts, observations, and forecast context.
+2. **Lightning layer** — flash locations colored by age; nearest flash; counts inside configurable radii/time windows; approaching/retreating trend; source age and coverage always visible.
+3. **Fluid radar engine** — frame preloading, cancellation, memory budget, missing-frame detection, smooth interpolation only when explicitly labeled, and station/product selection where lawful data supports it.
+4. **Storm-cell intelligence** — identify and track cells, motion vector, hail/wind/rotation evidence, uncertainty cone, and estimated arrival range rather than a false precise time.
+5. **Family Watch Zones** — multiple named locations, per-hazard thresholds, quiet hours, escalation rules, and deduplication.
+6. **“What changed?” briefing** — compare the current evidence state with the last verified snapshot.
+7. **Weather-source reconciliation** — measured station vs model nowcast vs official forecast, with disagreement highlighted instead of averaged away.
+
+## Backend boundary
+
+The weather system should gain a small trusted backend when lightning and historical intelligence are introduced. Its jobs:
+
+- Convert large/raw official products into efficient map tiles or vector events
+- Keep provider keys and tokens off public clients
+- Maintain durable history and replay
+- Deduplicate alerts and deliver background push notifications
+- Record immutable provenance, retrieval time, processing version, and checksums
+
+The browser remains the presentation and investigation client. The backend must not invent conclusions; it stores evidence and runs inspectable transforms.
+
+## Later intelligence modules
+
+- Air quality, smoke transport, flood/river gauges, storm reports, tsunami, volcano, drought, and tropical products
+- Offline app shell and last-known-state display with unmistakable stale/offline labeling
+- Automated cross-browser tests and schema-contract tests
+- Modular source files or TypeScript build once feature velocity makes the single-file architecture a liability
+- Durable history on the user’s own Proxmox/server, with exportable open formats
+
+## Standing integrity rules
+
+No faked data. No unlabeled mock data. No certainty language outside an official product. No silent source substitution. No private-infrastructure claims. No scanning or probing. Every derived finding must expose its inputs, age, confidence, and what would disprove it.
