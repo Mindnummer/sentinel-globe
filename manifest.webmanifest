@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "Sentinel Globe",
+  "name": "Sentinel Globe Weather Core",
   "short_name": "Sentinel",
-  "description": "Source-transparent public telemetry and weather situational-awareness command center.",
+  "description": "Truth-first radar, lightning, alerts, forecast, and public telemetry command center.",
   "lang": "en-US",
   "start_url": "./index.html",
   "scope": "./",
@@ -10,9 +10,23 @@
   "orientation": "any",
   "background_color": "#050a08",
   "theme_color": "#12241d",
-  "categories": ["weather", "utilities", "education"],
+  "categories": [
+    "weather",
+    "utilities",
+    "education"
+  ],
   "icons": [
-    {"src": "sentinel-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
-    {"src": "sentinel-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+    {
+      "src": "sentinel-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "sentinel-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ]
 }

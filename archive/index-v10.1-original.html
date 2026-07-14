@@ -3,10 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#12241d">
-<meta name="referrer" content="no-referrer">
-<link rel="icon" type="image/png" sizes="192x192" href="sentinel-icon-192.png">
-<link rel="apple-touch-icon" href="sentinel-icon-192.png">
 <title>Sentinel Globe — Public Telemetry Command Center</title>
 <link rel="stylesheet" href="maplibre-gl.css">
 <script src="maplibre-gl.js"></script>
@@ -14,7 +10,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <style>
 /* ============ SENTINEL GLOBE v2 — viridian command center ============
-   Local deployment bundle: index.html plus vendored libraries, manifest, and GeoJSON datasets.
+   3 files: index.html + vendored maplibre-gl.js/.css (pinned v5.24, ODbL/OSM basemap).
    No CDN at runtime. No telemetry. Keys live in YOUR browser only. */
 :root{
   --bg:#0a1210;--bg2:#0e1a16;--panel:#101f1aee;--panel2:#0c1714;
@@ -152,7 +148,7 @@ th{color:var(--vir2);font-size:9.5px;letter-spacing:1px;text-transform:uppercase
 .maplibregl-popup-content{background:var(--bg2)!important;color:var(--txt)!important;border:1px solid var(--vir)!important;
   border-radius:10px!important;font:12px/1.5 inherit!important;padding:10px 12px!important;font-family:var(--mono)}
 .maplibregl-popup-tip{border-top-color:var(--vir)!important}
-.bmRow{display:flex;gap:5px;margin:2px 0 8px}
+#bmRow{display:flex;gap:5px;margin:2px 0 8px}
 #feedBar{grid-area:feeds;display:flex;gap:5px;flex-wrap:wrap;align-items:center;padding:3px 10px;
   background:#04120c;border-bottom:1px solid #12261e;min-height:24px}
 .fchip{display:inline-flex;gap:5px;align-items:center;font-size:10px;color:#9fb8ae;background:#0a1a14;
@@ -175,7 +171,7 @@ body.focus #feedBar{display:none}
 .prerow .apply{cursor:pointer}.prerow .apply:hover{color:var(--vir3,#7fe0bd)}
 .prerow .del{margin-left:auto;cursor:pointer;color:#7a5a5a}
 .prerow .boot{cursor:pointer}.prerow .boot.on{color:#e0b24b}
-.bmRow .hbtn{flex:1;padding:5px 4px;font-size:10px}
+#bmRow .hbtn{flex:1;padding:5px 4px;font-size:10px}
 /* ---------- PHONE MODE: single column, full-width globe, bottom nav, slide-up sheets ---------- */
 @media (max-width:900px){
   html,body{overflow-x:hidden}
@@ -210,20 +206,6 @@ body.focus #feedBar{display:none}
 #mobileNav button{flex:1;background:none;border:none;color:#9fb8ae;font:11px inherit;cursor:pointer}
 #mobileNav button.on{color:var(--vir3,#7fe0bd);background:#12261e}
 body.focus #mobileNav{display:none!important}
-/* ---------- Weather Core ---------- */
-#radarBar{max-width:min(96vw,980px);flex-wrap:wrap;justify-content:center}
-#radarScrub{width:min(280px,28vw);accent-color:var(--vir2)}
-#radarSpeed,#radarSpan{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:7px;padding:4px}
-.wxgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:7px;margin:6px 0}
-.wxcard{background:#081510;border:1px solid var(--line);border-radius:9px;padding:8px}
-.wxcard .big{font:600 20px/1.2 var(--mono);color:var(--vir3);margin-top:2px}
-.wxbar{display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin:5px 0}
-.wxbar select{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:7px;padding:5px}
-.wxlegend{display:flex;gap:10px;flex-wrap:wrap;font-size:10px;color:var(--dim);margin:4px 0}
-.wxlegend span::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;background:var(--c)}
-body.wxmode #btnWeather{background:#58c7e8;color:#061217;border-color:#8de6ff;font-weight:700}
-body.wxmode #mapWrap{box-shadow:inset 0 0 0 1px #58c7e855}
-@media(max-width:900px){#radarBar{bottom:52px;padding:5px 7px;gap:5px}#radarScrub{width:42vw}.wxgrid{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
@@ -238,7 +220,6 @@ body.wxmode #mapWrap{box-shadow:inset 0 0 0 1px #58c7e855}
   </div>
   <button class="hbtn" id="btnHelp" title="What am I looking at? — explainer index">?</button>
   <button class="hbtn" id="btnNotif" title="Browser notifications for your home watch zone">🔔</button>
-  <button class="hbtn" id="btnWeather" title="Weather Core — radar, lightning, alerts and forecast">☁ WX</button>
   <button class="hbtn" id="btnFocus" title="Hide all panels — map only (great with Ambient)">◱ FOCUS</button>
   <button class="hbtn" id="btnFullscreen" title="True fullscreen (Esc to exit)">⛶</button>
   <button class="hbtn" id="btnAmbient" title="Slow beautiful auto-rotation — leave it running">◉ ORBIT</button>
@@ -258,16 +239,15 @@ body.wxmode #mapWrap{box-shadow:inset 0 0 0 1px #58c7e855}
 
 <div class="panel" id="left">
   <h2>Basemap <button class="ibtn" data-info="basemap">i</button></h2>
-  <div class="bmRow">
+  <div id="bmRow">
     <button class="hbtn" data-bm="osm">Street</button><button class="hbtn" data-bm="sat">Satellite</button>
     <button class="hbtn" data-bm="topo">Terrain</button><button class="hbtn" data-bm="dark">Dark</button>
   </div>
-  <h2>Views <button class="ibtn" data-info="views">i</button></h2>
-  <div class="bmRow">
+  <h2>Views <button class="ibtn" data-info="polar">i</button></h2>
+  <div id="bmRow">
     <button class="hbtn" id="btnViewGlobe">🌐 Globe</button><button class="hbtn" id="btnViewFlat">🗺 Flat world</button>
     <button class="hbtn" id="btnAELab">◎ Flat Map (Polar)</button>
-    <button class="hbtn" id="btnFollowISS" title="camera locks onto the ISS as it orbits">🛰 Follow ISS</button>
-    <button class="ibtn" data-info="follow" title="How Follow ISS works">i</button>
+    <button class="hbtn" id="btnFollowISS" title="camera locks onto the ISS as it orbits">🛰 Follow ISS <button class="ibtn" data-info="follow">i</button></button>
   </div>
   <div class="row" style="gap:4px;margin:2px 0">
     <button class="hbtn" id="rotCCW" title="rotate counterclockwise ([ key)">⟲ CCW</button>
@@ -287,9 +267,8 @@ body.wxmode #mapWrap{box-shadow:inset 0 0 0 1px #58c7e855}
     <label class="satrow"><input type="checkbox" data-sat="cosmos-2251-debris"> Debris: Cosmos-2251 <span class="finer">(first 400)</span></label>
     <div class="finer" id="satNote">SGP4-propagated from CelesTrak orbits — MODELED positions from MEASURED orbits. Not a video feed; none exists publicly.</div>
   </div>
-  <h2>Weather Core <button class="ibtn" data-info="weathercore">i</button></h2>
-  <button class="subbtn" id="btnRadarPlay">▶ Open fluid radar timeline</button>
-  <div id="lightningMini" class="finer">Lightning points require a Weatherbit key; NOAA GLM viewer works without one.</div>
+  <h2>Radar Loop <button class="ibtn" data-info="radar">i</button></h2>
+  <button class="subbtn" id="btnRadarPlay">▶ Play last 50 min</button>
   <h2>Power Infrastructure <button class="ibtn" data-info="power">i</button></h2>
   <button class="subbtn" id="btnScanPower">⚡ Scan plants / substations / lines in view</button>
   <div class="finer" id="powerNote">Zoom to at least county level, then scan. Source: OpenStreetMap (ODbL). Only public map data — never private topology.</div>
@@ -306,17 +285,14 @@ body.wxmode #mapWrap{box-shadow:inset 0 0 0 1px #58c7e855}
 <div id="mapWrap">
   <div id="map"></div>
   <div id="mockBanner">⚠ MOCK MODE — SAMPLE DATA IS DISPLAYED AND LABELED MOCK</div>
-  <div id="radarBar"><span>NEXRAD</span>
-    <button class="hbtn" id="radarBack" title="previous frame">◀</button><button class="hbtn" id="btnRadarPause">▶</button><button class="hbtn" id="radarNext" title="next frame">▶|</button>
-    <input type="range" id="radarScrub" min="0" max="10" step="1" value="10" title="scrub radar timeline">
-    <select id="radarSpeed" title="playback speed"><option value="1100">0.5×</option><option value="650" selected>1×</option><option value="350">2×</option></select>
+  <div id="radarBar"><span>NEXRAD</span><button class="hbtn" id="btnRadarPause">⏸</button>
     <select id="radarSpan" title="loop length — beyond 50 min uses the IEM archive (experimental)">
       <option value="50">50 min · live</option><option value="180">3 h · archive</option>
       <option value="720">12 h · archive</option><option value="1440">24 h · archive</option>
       <option value="4320">72 h · archive</option></select>
     <input type="range" id="radarOpacity" min="0.2" max="1" step="0.05" value="0.72" title="radar opacity" style="width:64px;vertical-align:middle">
     <span id="radarTime">latest</span><span id="radarLbl"></span></div>
-  <div id="mapAttrib">© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors · Radar: NOAA/IEM · MapLibre</div>
+  <div id="mapAttrib">© <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors · Radar: NOAA/IEM · MapLibre</div>
 </div>
 
 <div class="panel" id="right">
@@ -329,7 +305,6 @@ body.wxmode #mapWrap{box-shadow:inset 0 0 0 1px #58c7e855}
 <div class="panel" id="bottom">
   <div id="tabs">
     <div class="tab on" data-tab="alerts">ALERTS</div>
-    <div class="tab" data-tab="weather">WEATHER</div>
     <div class="tab" data-tab="grid">GRID</div>
     <div class="tab" data-tab="ledger">TRUTH LEDGER <button class="ibtn" data-info="ledger">i</button></div>
     <div class="tab" data-tab="watchdog">WATCHDOG <button class="ibtn" data-info="watchdog">i</button></div>
@@ -346,12 +321,12 @@ body.wxmode #mapWrap{box-shadow:inset 0 0 0 1px #58c7e855}
 <div id="modalBack"><div id="modal"></div></div>
 <script>
 /* ===== SINGLE SOURCE OF TRUTH for the build version — bump ONLY here ===== */
-const APP_VERSION="10.2.0";
+const APP_VERSION="10.1";
 document.title="Sentinel Globe v"+APP_VERSION+" — Public Telemetry";
 document.addEventListener("DOMContentLoaded",()=>{const v=document.getElementById("verTag");
   if(v)v.textContent="v"+APP_VERSION+" · PUBLIC TELEMETRY";});
 /* =====================================================================
-   SENTINEL GLOBE v10.2 — Weather Core
+   SENTINEL GLOBE v2 — core
    Integrity law: every value carries {source, timestamp, confidence}.
    Vocabulary: MEASURED | OFFICIAL | MODELED | MOCK | EXPERIMENTAL | UNAVAILABLE
    ===================================================================== */
@@ -362,38 +337,20 @@ const fmtAge=t=>{if(!t)return"—";const s=(now()-t)/1e3;return s<90?Math.round(
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const store={get:(k,d)=>{try{const v=localStorage.getItem("sg2_"+k);return v==null?d:JSON.parse(v);}catch(e){return d;}},
              set:(k,v)=>{try{localStorage.setItem("sg2_"+k,JSON.stringify(v));}catch(e){}}};
-const DEFAULT_HOME={name:"Decatur, TX 76234 (default — change in ⚙)",lat:33.2343,lon:-97.5861};
-const savedHome=store.get("home",DEFAULT_HOME);
-const safeHome=savedHome&&Number.isFinite(+savedHome.lat)&&Number.isFinite(+savedHome.lon)&&
-  +savedHome.lat>=-90&&+savedHome.lat<=90&&+savedHome.lon>=-180&&+savedHome.lon<=180
-  ?{name:String(savedHome.name||"Saved home").slice(0,160),lat:+savedHome.lat,lon:+savedHome.lon}:DEFAULT_HOME;
-const savedBasemap=store.get("basemap","osm");
-const savedPerf=store.get("perf","auto");
 const cfg={
   firmsKey:store.get("firmsKey",""), eiaKey:store.get("eiaKey",""), nasaKey:store.get("nasaKey","DEMO_KEY"),
-  tomtomKey:store.get("tomtomKey",""), aisKey:store.get("aisKey",""), weatherbitKey:store.get("weatherbitKey",""),
-  lightningRadius:Math.max(10,Math.min(75,Number(store.get("lightningRadius",50))||50)),
-  lightningMinutes:Math.max(10,Math.min(45,Number(store.get("lightningMinutes",30))||30)),
+  tomtomKey:store.get("tomtomKey",""), aisKey:store.get("aisKey",""),
   showAlt:store.get("showAlt",true), enrich:store.get("enrich",true),
   autoStreet:store.get("autoStreet",true), clutter:store.get("clutter",true),
-  home:safeHome,
-  basemap:["osm","sat","topo","dark"].includes(savedBasemap)?savedBasemap:"osm",
-  orbitSpeed:Math.max(0.2,Math.min(8,Number(store.get("orbitSpeed",1))||1)),
-  perf:["auto","low","high"].includes(savedPerf)?savedPerf:"auto",
+  home:store.get("home",{name:"Decatur, TX 76234 (default — change in ⚙)",lat:33.2343,lon:-97.5861}),
 };
-$("orbitSpeed").value=String(cfg.orbitSpeed);
-$("orbitSpeedV").textContent=cfg.orbitSpeed.toFixed(1).replace(".0","")+"×";
 const S={loc:cfg.home, mock:false, integrity:false, ambient:false,
-         quakes:[], fires:[], lightning:[], lightningMeta:null, aircraft:[], alerts:[], donki:[], ba:{}, power:null,
+         quakes:[], fires:[], aircraft:[], alerts:[], donki:[], ba:{}, power:null,
          ships:{}, sats:[], flows:[], issTrack:[], issRec:null,
          kp:null, wind:null, xray:null, iss:null, issTrail:[], meteo:null, anomalies:[]};
 const haversine=(a,b,c,d)=>{const R=6371,r=x=>x*Math.PI/180;
   const h=Math.sin(r(c-a)/2)**2+Math.cos(r(a))*Math.cos(r(c))*Math.sin(r(d-b)/2)**2;
   return 2*R*Math.asin(Math.sqrt(h));};
-function radiusPolygon(lat,lon,km){const R=6371,la=lat*Math.PI/180,lo=lon*Math.PI/180,ang=km/R,pts=[];
-  for(let b=0;b<=360;b+=5){const br=b*Math.PI/180;const la2=Math.asin(Math.sin(la)*Math.cos(ang)+Math.cos(la)*Math.sin(ang)*Math.cos(br));
-    const lo2=lo+Math.atan2(Math.sin(br)*Math.sin(ang)*Math.cos(la),Math.cos(ang)-Math.sin(la)*Math.sin(la2));pts.push([lo2*180/Math.PI,la2*180/Math.PI]);}
-  return{type:"Feature",properties:{km},geometry:{type:"Polygon",coordinates:[pts]}};}
 
 /* =====================================================================
    TRUTH LEDGER — chain of evidence for every fetch and alert
@@ -419,7 +376,7 @@ function watchdogSweep(){
     wd(id, age>a.staleSec?"warn":"ok", age>a.staleSec?`stale ${fmtAge(a.lastOk)} (limit ${Math.round(a.staleSec/60)}m)`:`fresh · ${fmtAge(a.lastOk)}`);
   }
   // mock-data guard: RED if any mock item visible while in live mode
-  const leak=!S.mock&&(S.quakes.some(q=>q.mock)||S.fires.some(f=>f.mock)||S.lightning.some(x=>x.mock)||S.alerts.some(a=>a.mock));
+  const leak=!S.mock&&(S.quakes.some(q=>q.mock)||S.fires.some(f=>f.mock)||S.alerts.some(a=>a.mock));
   wd("mockguard",leak?"bad":"ok",leak?"MOCK DATA VISIBLE IN LIVE MODE — investigate":"no mock data in live views");
   wd("clock",Math.abs(new Date().getTimezoneOffset())<900?"ok":"warn","browser clock/timezone sane check");
 }
@@ -432,9 +389,7 @@ const INFO={
 layers:{t:"Layers",w:"Each toggle draws one public data stream on the map. Colored dot = its map color. Badge = confidence class. Right number = data age.",s:"—",f:"—",c:"—",l:"Confidence vocabulary: MEASURED (instrument), OFFICIAL (government alert product), MODELED (computed), MOCK (sample, always labeled), EXPERIMENTAL."},
 quakes:{t:"Earthquakes",w:"Every earthquake USGS has published for the selected window. Circle size = magnitude, color = how recent (bright = newer). Click any circle for details.",s:"USGS earthquake.usgs.gov GeoJSON feed",f:"Feed updates ~1 min; small quakes can take minutes–hours to appear",c:"MEASURED",l:"Magnitudes are revised after analyst review; early values shift."},
 alerts:{t:"US Weather Alerts",w:"Active National Weather Service warnings/watches/advisories. Polygons drawn where NWS provides geometry; all point alerts for your location appear in the ALERTS tab and Local Brief.",s:"NWS api.weather.gov (official)",f:"Refreshed every 3 min",c:"OFFICIAL",l:"US only. Some alerts have no polygon (county-based) so they list but don't draw."},
-radar:{t:"Live Radar (NEXRAD)",w:"US composite radar reflectivity served in roughly 5-minute frames. The timeline now supports scrubbing, stepping, playback speed, crossfades and longer archive spans.",s:"NOAA NEXRAD via Iowa Environmental Mesonet tile cache",f:"New frame every ~5 min",c:"MEASURED",l:"US coverage only. Reflectivity ≠ rain at ground (virga, birds, ground clutter possible). Spans beyond 50 min use IEM timestamped archive composites — EXPERIMENTAL: a blank frame can be an archive gap, not clear skies."},
-lightning:{t:"Recent Lightning",w:"Recent lightning flash/detection locations around the focused point, colored by age. The ring marks the exact search radius. Counts, nearest distance, and a cautious recent-versus-prior activity trend appear in Weather.",s:"Weatherbit Current Lightning API; source field retained per detection. NOAA GLM viewer is linked as the official no-key visual cross-check.",f:"Sensor-derived regions update about every 5 min; Sentinel polls no faster than every 15 min to protect quota",c:"MEASURED / DERIVED",l:"A satellite lightning flash can be in-cloud or cloud-to-ground; do not treat every point as a ground strike. Weatherbit access depends on account plan and each call consumes provider quota."},
-weathercore:{t:"Weather Core",w:"A focused operating mode that brings radar, lightning, NWS alerts, measured station observations and model forecast into one desk. Entering Weather Core temporarily hides unrelated layers; leaving restores your prior layer state.",s:"NWS + NEXRAD/IEM + Weatherbit (optional) + NOAA GLM viewer + Open-Meteo",f:"Per source",c:"Mixed, explicitly labeled",l:"Sentinel is situational awareness, not a substitute for NOAA Weather Radio or local emergency instructions. Radar motion and lightning trends are observations, not deterministic arrival promises."},
+radar:{t:"Live Radar (NEXRAD)",w:"Composite US weather radar (reflectivity). The loop plays the last 50 minutes in 5-minute frames so you can see storm motion. This IS the live national feed — NEXRAD radars physically complete a volume scan every 4–6 minutes; no public source is faster.",s:"NOAA NEXRAD via Iowa Environmental Mesonet tile cache",f:"New frame every ~5 min",c:"MEASURED",l:"US coverage only. Reflectivity ≠ rain at ground (virga, birds, ground clutter possible). Spans beyond 50 min switch to IEM's timestamped ARCHIVE composites (years deep, 5-min steps) — EXPERIMENTAL: a blank frame is an archive gap, not clear skies; the frame label always shows how far back you are looking."},
 fires:{t:"Active Fires",w:"Satellite thermal-anomaly detections. Click a dot for detection time, satellite, and FIRMS confidence.",s:"NASA FIRMS (VIIRS), free key in ⚙",f:"Satellites revisit every 3–6 h; refreshed 15 min",c:"MEASURED",l:"A detection is a heat anomaly, not a confirmed fire (gas flares, industry trigger it). Clouds hide fires."},
 iss:{t:"ISS Live Position",w:"The International Space Station right now, with its recent ground trail. It orbits every ~92 min at ~7.66 km/s.",s:"WhereTheISS.at (TLE propagation)",f:"Every 65 s",c:"MEASURED",l:"~km-scale accuracy. Pass predictions for your yard: Phase 2 (needs SGP4)."},
 aircraft:{t:"Aircraft (ADS-B)",w:"Aircraft broadcasting ADS-B near the map center. Click for callsign, altitude, speed, heading.",s:"OpenSky Network, anonymous tier",f:"On refresh, ~60 s",c:"MEASURED",l:"HONEST LIMIT: OpenSky heavily restricts anonymous access (a few hundred requests/day, sometimes blocked entirely). If the Watchdog shows this yellow/red, that is OpenSky refusing anonymous traffic — not a bug here. Reliable feed needs their free OAuth account + a tiny proxy (Phase 3). Coverage depends on volunteer receivers; military/some GA aircraft don't broadcast."},
@@ -442,16 +397,16 @@ ba:{t:"Grid Stress — Balancing Authorities",w:"A balancing authority (BA) is t
 spacewx:{t:"Space Weather",w:"Kp (global geomagnetic disturbance 0–9), solar-wind speed measured 1.5M km upstream, and GOES X-ray flux (flare class A/B/C/M/X).",s:"NOAA SWPC + NASA DONKI",f:"1–5 min products",c:"MEASURED",l:"Solar wind at L1 arrives at Earth 15–60 min later. Storm effects on grid/GPS/HF are probabilistic — this app words them as watch conditions only."},
 terminator:{t:"Day/Night Line",w:"Where it is currently daylight vs night, computed from the sun's position.",s:"Computed locally",f:"Continuous",c:"MODELED",l:"±minutes accuracy (equation of time simplified)."},
 power:{t:"Power Infrastructure (OSM)",w:"Power plants, substations, and transmission lines that volunteers have mapped in OpenStreetMap — the same public data behind OpenInfraMap. Zoom into your area (Wise County works well) and press Scan. Click any feature for name, operator, voltage, output where mapped.",s:"OpenStreetMap via Overpass API (ODbL)",f:"On demand",c:"MEASURED (crowd-mapped)",l:"Coverage varies — unmapped ≠ nonexistent. This is lawful public map data only: no private topology, no vulnerability info, no non-public detail, ever."},
-brief:{t:"Local Brief",w:"Everything relevant to your searched location in one card: conditions, lightning, nearest quake, nearest fire, active alerts, space weather, moon.",s:"All active adapters",f:"Follows each source",c:"mixed, labeled per line",l:"Only as complete as the sources feeding it."},
-watchconditions:{t:"Anomalies & Watch Conditions",w:"The rule engine compares layers against each other and against baseline. Every finding shows severity, confidence, sources, why it fired, and what would increase confidence.",s:"Rule engine (local)",f:"Every refresh",c:"MODELED",l:"Hypotheses, not predictions. Nothing here is worded as certainty unless the underlying source is an official alert."},
+brief:{t:"Local Brief",w:"Everything relevant to your searched location in one card: conditions, nearest quake, nearest fire, active alerts, space weather, moon.",s:"All active adapters",f:"Follows each source",c:"mixed, labeled per line",l:"Only as complete as the sources feeding it."},
+anom:{t:"Anomalies & Watch Conditions",w:"The rule engine compares layers against each other and against baseline. Every finding shows severity, confidence, sources, why it fired, and what would increase confidence.",s:"Rule engine (local)",f:"Every refresh",c:"MODELED",l:"Hypotheses, not predictions. Nothing here is worded as certainty unless the underlying source is an official alert."},
 moon:{t:"Moon & Sun",w:"Current moon phase, illumination %, and the subsolar point driving the day/night line.",s:"Computed locally",f:"Continuous",c:"MODELED",l:"±minutes; no topocentric correction."},
 counties:{t:"County Lines & Names",w:"US county boundaries with names appearing as you zoom in (names from zoom ~7). Wise County is drawn from the same official geometry as every other county.",s:"US Census Bureau cartographic boundary file, vendored in this repo (public domain)",f:"Static — county lines rarely change",c:"OFFICIAL",l:"US only. Simplified to ~110 m precision for speed — fine for orientation, not for legal property boundaries."},
 basemap:{t:"Basemaps",w:"The background map. Street = OpenStreetMap with roads, cities, and town names. Satellite = aerial imagery with a city/road label overlay. Terrain = topographic. Dark = minimal, best for leaving Ambient mode running. All data layers draw on top of whichever you pick.",s:"OSM · Esri World Imagery · OpenTopoMap · CARTO",f:"Tile providers update on their own schedules",c:"MEASURED",l:"Satellite imagery is a mosaic — some areas are months to years old, it is not live. Attribution shown bottom-right, as the providers require."},
 watchdog:{t:"Watchdog",w:"The app monitoring itself: every source's freshness, failures, rate limits, stale caches, and a guard that flags RED if mock data ever appears while in live mode. Green = healthy, yellow = degraded, red = failure, gray = not configured.",s:"Internal checks",f:"Sweeps every 30 s",c:"—",l:"It can only see what the sources return — a provider sending wrong-but-well-formed data is caught only if it contradicts another source."},
 ledger:{t:"Truth Ledger",w:"An append-only log of every fetch this session: source, URL, time, result, confidence class, and known limits. If you wonder where any number came from, the answer is here.",s:"Internal",f:"Written at every fetch",c:"—",l:"Lives in this browser session; Phase 3 adds durable history in a database."},
 sources:{t:"Sources & Integrity",w:"The registry of every data source with its terms posture, refresh rate, and honest limitations, plus this app's standing integrity rules.",s:"Internal",f:"—",c:"—",l:"—"},
-notif:{t:"Notifications",w:"When ON, your browser notifies you even in another tab for: new official NWS alerts independently fetched for home, recent lightning within ~10 mi when the lightning query is focused on home, quakes M4.5+ within ~300 mi, Kp reaching 6+, or a fire detection within ~50 mi. Each event notifies once (deduplicated).",s:"Rules run locally on the same public feeds",f:"Evaluated every refresh cycle",c:"mixed, per underlying source",l:"Only works while the tab is open (a PWA/service-worker version is Phase 3). Browser must grant permission. This is convenience, not a life-safety system — a NOAA weather radio does not depend on your browser."},
-modes:{t:"Header Modes",w:"WX = focused Weather Core; it temporarily shows radar, lightning, alerts and county context, then restores your prior layers when closed. AMBIENT = slow, beautiful globe auto-rotation for leaving on a wall screen; touching the map pauses it. INTEGRITY = hides anything mock, experimental, or low-confidence — only verified live data remains. MOCK = clearly-banner-labeled sample data for testing the interface. 🔔 = browser notifications for your home watch zone. ◱ FOCUS = hides every panel so the map alone fills the window. ⛶ = true fullscreen (press Esc to exit). Stack all three — Fullscreen + Focus + Ambient — for a wall display.",s:"—",f:"—",c:"—",l:"MOCK and live can never mix silently: the Watchdog flags RED if mock items appear outside Mock mode."},
+notif:{t:"Notifications",w:"When ON, your browser notifies you even in another tab for: new official NWS alerts at your home location, quakes M4.5+ within ~300 mi of home, Kp reaching 6+ (strong geomagnetic storm), or a fire detection within ~50 mi of home. Each event notifies once (deduplicated).",s:"Rules run locally on the same public feeds",f:"Evaluated every refresh cycle",c:"mixed, per underlying source",l:"Only works while the tab is open (a PWA/service-worker version is Phase 3). Browser must grant permission. This is convenience, not a life-safety system — a NOAA weather radio does not depend on your browser."},
+modes:{t:"Header Modes",w:"AMBIENT = slow, beautiful globe auto-rotation for leaving on a wall screen; touching the map pauses it. INTEGRITY = hides anything mock, experimental, or low-confidence — only verified live data remains. MOCK = clearly-banner-labeled sample data for testing the interface. 🔔 = browser notifications for your home watch zone. ◱ FOCUS = hides every panel so the map alone fills the window. ⛶ = true fullscreen (press Esc to exit). Stack all three — Fullscreen + Focus + Ambient — for a wall display.",s:"—",f:"—",c:"—",l:"MOCK and live can never mix silently: the Watchdog flags RED if mock items appear outside Mock mode."},
 views:{t:"Views: Globe, Flat World, Flat Polar",w:"Three ways to see the same live data. Globe: the 3D sphere — drag with right-click or two fingers to pitch and orbit it. Flat World: a rectangular world map; with the ISS layer on, its ground track draws the wave pattern seen on NASA mission-control walls. Flat Map (Polar): North Pole at center, Antarctica along the rim — the layout of the UN emblem and the Flat Earth Society map — fully interactive: scroll to zoom, drag to spin, hover for coordinates, with quakes, fires, grid regions, and the live ISS drawn on it.",s:"Identical data across all three views",f:"—",c:"—",l:"The Polar view now takes over the full map area: drag to pan anywhere, scroll to zoom (anchored to your cursor), ⌂ recenters on home, US county lines appear as you zoom, and past a certain zoom a 'Continue to street level' button hands the exact spot to the tile-based views — at neighborhood scale every projection converges, so the hand-off is seamless. Its own renderer draws it because the tile engine only serves Globe and Mercator."},
 perf:{t:"Performance Modes",w:"AUTO senses your device (memory/cores) and picks; LOW renders at 1× scale and drops the densest labels for phones and weak laptops; HIGH is full quality. The genuinely heavy layers, in order: Satellites (SGP4 math for hundreds of objects), Radar Loop (12 tile textures), Fault Lines (13,696 lines), Starlink group. Toggle those off first if anything stutters.",s:"—",f:"—",c:"—",l:"AUTO's device sensing is approximate — browsers deliberately fuzz hardware info."},
 customkeys:{t:"Your Own Keys",w:"A place to store ANY API key you find, with your own label. Saved locally, included in key export and FULL backup. When a future adapter needs that provider, the key is already waiting — no rebuild needed.",s:"You",f:"—",c:"—",l:"Storing a key does not create an adapter — data starts flowing when an adapter for that provider exists. Ask and it gets built into the next version."},
@@ -520,14 +475,7 @@ function nightPolygon(){ // polygon of the night hemisphere for the terminator l
 async function geocode(q){
   q=q.trim();if(!q)return null;
   const m=q.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
-  if(m){
-    const lat=+m[1],lon=+m[2];
-    if(!Number.isFinite(lat)||!Number.isFinite(lon)||lat<-90||lat>90||lon<-180||lon>180){
-      ledger("Geocoder","","rejected out-of-range coordinates: "+q,"FAIL","UNAVAILABLE","latitude must be -90…90 and longitude -180…180");
-      return null;
-    }
-    return{name:`${lat}, ${lon}`,lat,lon,z:14};
-  }
+  if(m)return{name:`${m[1]}, ${m[2]}`,lat:+m[1],lon:+m[2],z:14};
   try{
     const looksAddress=/\d/.test(q)&&/[a-zA-Z]/.test(q)&&!/^\d{5}$/.test(q);
     if(looksAddress){
@@ -612,7 +560,6 @@ const BASEMAPS={
   dark:{label:"Dark",layers:["dark"],attrib:"© CARTO © OpenStreetMap contributors"},
 };
 function setBasemap(id){
-  if(!Object.prototype.hasOwnProperty.call(BASEMAPS,id))id="osm";
   cancelFollowSafe("overlay change");cfg.basemap=id;store.set("basemap",id);
   const active=BASEMAPS[id].layers;
   ["osm","sat","topo","dark","satlabels"].forEach(l=>map.getLayer(l)&&
@@ -646,9 +593,6 @@ const SRC={ // each returns fresh GeoJSON from state
     properties:{mag:q.mag,place:q.place,ageH:(now()-q.t)/36e5,depth:q.depth,mock:!!q.mock,t:q.t}}))}),
   fires:()=>({type:"FeatureCollection",features:S.fires.map(f=>({type:"Feature",
     geometry:{type:"Point",coordinates:[f.lon,f.lat]},properties:{conf:f.conf,when:f.when,sat:f.sat,mock:!!f.mock}}))}),
-  lightning:()=>({type:"FeatureCollection",features:S.lightning.map(x=>({type:"Feature",
-    geometry:{type:"Point",coordinates:[x.lon,x.lat]},properties:{id:String(x.id||""),pastMins:x.pastMins,distanceKm:x.distanceKm,source:x.source,type:x.type,t:x.t,mock:!!x.mock}}))}),
-  lightningzone:()=>S.loc?radiusPolygon(S.loc.lat,S.loc.lon,cfg.lightningRadius):EMPTY,
   aircraft:()=>({type:"FeatureCollection",features:S.aircraft.map(a=>({type:"Feature",
     geometry:{type:"Point",coordinates:[a.lon,a.lat]},properties:{cs:a.cs,alt:a.alt,vel:a.vel,hdg:a.hdg,icao:a.icao}}))}),
   iss:()=>S.iss?{type:"FeatureCollection",features:[{type:"Feature",
@@ -724,12 +668,6 @@ map.on("load",()=>{
       "icon-size":["interpolate",["linear"],["coalesce",["get","mag"],3],2,0.35,4.5,0.65,6,0.95,7.5,1.3]}});
   map.addLayer({id:"fires",type:"symbol",source:"fires",
     layout:{"icon-image":"i-fire","icon-size":0.5,"icon-allow-overlap":true}});
-  map.addLayer({id:"lightning-zone-fill",type:"fill",source:"lightningzone",layout:{visibility:"none"},paint:{"fill-color":"#58c7e8","fill-opacity":0.035}});
-  map.addLayer({id:"lightning-zone",type:"line",source:"lightningzone",layout:{visibility:"none"},paint:{"line-color":"#58c7e8","line-width":1.2,"line-opacity":0.65,"line-dasharray":[3,2]}});
-  map.addLayer({id:"lightning",type:"circle",source:"lightning",layout:{visibility:"none"},paint:{
-    "circle-radius":["interpolate",["linear"],["zoom"],3,3,9,6,14,9],
-    "circle-color":["case",["<=",["get","pastMins"],5],"#ff496c",["<=",["get","pastMins"],15],"#ffb84d","#ffe56b"],
-    "circle-opacity":0.88,"circle-stroke-color":"#fff7c2","circle-stroke-width":1,"circle-stroke-opacity":0.75}});
   map.addLayer({id:"aircraft",type:"symbol",source:"aircraft",
     layout:{"icon-image":"i-plane","icon-size":0.5,"icon-allow-overlap":true,
       "icon-rotate":["-",["coalesce",["get","hdg"],0],45],"icon-rotation-alignment":"map"}});
@@ -747,8 +685,6 @@ map.on("load",()=>{
     <br><span style="color:#8fa69e">USGS · MEASURED${p.mock==="true"||p.mock===true?" · <b>MOCK</b>":""}</span>`,e.lngLat);});
   map.on("click","fires",e=>{const p=e.features[0].properties;
     pop(`<b>Thermal detection</b><br>${esc(p.when)} UTC · sat ${esc(p.sat)}<br>FIRMS confidence: ${esc(p.conf)}<br><span style="color:#8fa69e">NASA FIRMS · detection ≠ confirmed fire${p.mock==="true"||p.mock===true?" · <b>MOCK</b>":""}</span>`,e.lngLat);});
-  map.on("click","lightning",e=>{const p=e.features[0].properties;
-    pop(`<b>⚡ Recent lightning ${esc(p.type||"detection")}</b><br>${(+p.pastMins).toFixed(1)} min ago · ${(+p.distanceKm*0.621371).toFixed(1)} mi from focus<br>source ${esc(p.source||"provider")}${p.mock==="true"||p.mock===true?" · <b>MOCK</b>":""}<br><span style="color:#8fa69e">MEASURED location/time. Satellite flashes can be in-cloud; point does not prove a ground strike.</span>`,e.lngLat);});
   map.on("click","aircraft",async e=>{const p=e.features[0].properties;
     const pid="acr"+now();
     pop(`<b>${esc(p.cs||p.icao)}</b><br>alt ${p.alt?Math.round(p.alt)+" m":"—"} · ${p.vel?Math.round(p.vel*1.944)+" kt":"—"} · hdg ${p.hdg?Math.round(p.hdg)+"°":"—"}
@@ -790,7 +726,7 @@ map.on("load",()=>{
     pop(`<b>Substation</b> ${esc(p.name||"")}<br>${p.volt?"Voltage: "+esc(p.volt)+"<br>":""}<span style="color:#8fa69e">OpenStreetMap (ODbL)</span>`,e.lngLat);});
   map.on("click","power-lines",e=>{const p=e.features[0].properties;
     pop(`<b>Transmission line</b><br>${p.volt?"Voltage: "+esc(p.volt)+"<br>":""}<span style="color:#8fa69e">OpenStreetMap (ODbL)</span>`,e.lngLat);});
-  ["quakes","fires","lightning","aircraft","ba","power-plants","power-subs","power-lines"].forEach(l=>{
+  ["quakes","fires","aircraft","ba","power-plants","power-subs","power-lines"].forEach(l=>{
     map.on("mouseenter",l,()=>map.getCanvas().style.cursor="pointer");
     map.on("mouseleave",l,()=>map.getCanvas().style.cursor="");});
   wd("map","ok","MapLibre v5 globe ready");
@@ -798,62 +734,67 @@ map.on("load",()=>{
 map.on("error",e=>{const m=e&&e.error&&e.error.message||"map error";
   if(!/tile/i.test(m))wd("map","warn",m);});
 
-/* ---------- radar loop: scrubber + step controls + crossfade + adaptive hold ---------- */
-let radarPlaying=false, radarFrame=RADAR_FRAMES.length-1, radarTimer=null, radarDelay=650;
+/* ---------- radar loop ---------- */
+let radarPlaying=false, radarFrame=RADAR_FRAMES.length-1, radarTimer=null;
 const radarCount=()=>radarSpanMin>50?radarArchive.length:RADAR_FRAMES.length;
-let radarFadeTimer=null,radarPrev=-1,radarPrefix="radar";
-function radarOpacityTarget(){const e=$("radarOpacity");return e?+e.value:0.72;}
-function radarUpdateControls(){const n=Math.max(1,radarCount()),sc=$("radarScrub");
-  if(sc){sc.max=String(n-1);sc.value=String(Math.max(0,Math.min(n-1,radarFrame)));}
-  $("btnRadarPause").textContent=radarPlaying?"⏸":"▶";
-  $("btnRadarPlay").textContent=radarPlaying?"⏸ Pause radar":"▶ Open fluid radar timeline";}
+let radarFadeTimer=null,radarPrev=-1;
+function radarOpacityTarget(){const s=document.getElementById("radarOpacity");return s?+s.value:0.72;}
 function radarCrossfade(prefix,fromI,toI,count){
-  clearInterval(radarFadeTimer);const op=radarOpacityTarget();let step=0,STEPS=7;
+  clearInterval(radarFadeTimer);
+  const op=radarOpacityTarget();let step=0,STEPS=6;
   for(let j=0;j<count;j++){const id=prefix+j;if(!map.getLayer(id))continue;
-    const keep=j===toI||(prefix===radarPrefix&&j===fromI);map.setLayoutProperty(id,"visibility",keep?"visible":"none");
-    if(!keep)map.setPaintProperty(id,"raster-opacity",0);}
+    map.setLayoutProperty(id,"visibility",(j===toI||j===fromI)?"visible":"none");
+    if(j!==toI&&j!==fromI)map.setPaintProperty(id,"raster-opacity",0);}
   radarFadeTimer=setInterval(()=>{step++;const t=step/STEPS;
-    try{if(map.getLayer(prefix+toI))map.setPaintProperty(prefix+toI,"raster-opacity",op*t);
-      if(fromI>=0&&fromI!==toI&&prefix===radarPrefix&&map.getLayer(prefix+fromI))map.setPaintProperty(prefix+fromI,"raster-opacity",op*(1-t));}catch(e){}
-    if(step>=STEPS){clearInterval(radarFadeTimer);if(fromI>=0&&fromI!==toI&&prefix===radarPrefix&&map.getLayer(prefix+fromI))try{map.setLayoutProperty(prefix+fromI,"visibility","none");}catch(e){}}},45);}
-function radarPrime(prefix,i,count){if(count<2)return;const n=(i+1)%count,id=prefix+n;
-  if(!map.getLayer(id))return;try{map.setLayoutProperty(id,"visibility","visible");map.setPaintProperty(id,"raster-opacity",0);
-    setTimeout(()=>{if(radarFrame!==n&&map.getLayer(id))map.setLayoutProperty(id,"visibility","none");},1800);}catch(e){}}
-function radarShow(i){const count=radarCount();if(!count)return;radarFrame=Math.max(0,Math.min(count-1,i));
-  const prefix=radarSpanMin>50?"radarA":"radar";
-  if(prefix!==radarPrefix){radarPrev=-1;radarPrefix=prefix;}
-  const other=prefix==="radar"?"radarA":"radar";
-  const otherCount=prefix==="radar"?radarArchive.length:RADAR_FRAMES.length;
-  for(let j=0;j<otherCount;j++)try{map.getLayer(other+j)&&map.setLayoutProperty(other+j,"visibility","none");}catch(e){}
-  if(LAYERS.radar.on)radarCrossfade(prefix,radarPrev,radarFrame,count);radarPrev=radarFrame;
-  if(prefix==="radar"){
-    const back=(RADAR_FRAMES.length-1-radarFrame)*5;$("radarTime").textContent=back===0?"latest":`now − ${back} min`;$("radarLbl").textContent="";
-  }else{const f=radarArchive[radarFrame];$("radarTime").textContent=f?f.label:"archive";$("radarLbl").textContent="EXPERIMENTAL archive";}
-  radarUpdateControls();radarPrime(prefix,radarFrame,count);}
-/* Archive radar: IEM timestamped US composites. Missing frames can be archive gaps. */
+    try{
+      if(map.getLayer(prefix+toI))map.setPaintProperty(prefix+toI,"raster-opacity",op*t);
+      if(fromI>=0&&fromI!==toI&&map.getLayer(prefix+fromI))map.setPaintProperty(prefix+fromI,"raster-opacity",op*(1-t));
+    }catch(e){}
+    if(step>=STEPS){clearInterval(radarFadeTimer);
+      if(fromI>=0&&fromI!==toI&&map.getLayer(prefix+fromI))try{map.setLayoutProperty(prefix+fromI,"visibility","none");}catch(e){}}},55);}
+function radarShowLive(i){
+  radarCrossfade("radar",radarPrev,i,RADAR_FRAMES.length);radarPrev=i;
+  const back=(RADAR_FRAMES.length-1-i)*5;
+  $("radarTime").textContent=back===0?"latest":`now − ${back} min`;}
+/* Archive radar: IEM keeps timestamped US composites (ridge::USCOMP-N0Q-YYYYMMDDHHMM, 5-min steps, years deep).
+   EXPERIMENTAL: occasional missing frames are the archive's gaps, not the app's. */
 function radarSetSpan(min){
-  radarSpanMin=min;radarPlay(false);
-  radarArchive.forEach((_,j)=>{try{map.getLayer("radarA"+j)&&map.removeLayer("radarA"+j);map.getSource("radarA"+j)&&map.removeSource("radarA"+j);}catch(e){}});radarArchive=[];
-  if(min>50){const N=12,step=min/N;
-    for(let j=0;j<N;j++){const ago=min-j*step,t=new Date(now()-ago*6e4);t.setUTCMinutes(Math.floor(t.getUTCMinutes()/5)*5,0,0);
-      const ts=t.toISOString().replace(/[-:TZ]/g,"").slice(0,12);radarArchive.push({ts,label:ago>=60?(ago/60).toFixed(1)+" h ago":Math.round(ago)+" min ago"});
-      map.addSource("radarA"+j,{type:"raster",tileSize:256,tiles:[`https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-${ts}/{z}/{x}/{y}.png`]});
-      map.addLayer({id:"radarA"+j,type:"raster",source:"radarA"+j,layout:{visibility:"none"},paint:{"raster-opacity":0}},"county-lines");}
-    ledger("IEM NEXRAD archive","mesonet.agron.iastate.edu",`radar span ${min>=60?min/60+" h":min+" min"} — 12 frames`,"OK","MEASURED","EXPERIMENTAL archive; gaps can render blank");}
-  radarPrev=-1;radarPrefix=min>50?"radarA":"radar";radarFrame=radarCount()-1;radarShow(radarFrame);}
-function radarSchedule(){clearTimeout(radarTimer);if(!radarPlaying)return;
-  const hold=radarFrame===radarCount()-1?Math.round(radarDelay*1.8):radarDelay;
-  radarTimer=setTimeout(()=>{radarFrame=(radarFrame+1)%radarCount();radarShow(radarFrame);radarSchedule();},hold);}
-function radarPlay(on){radarPlaying=!!on;$("radarBar").classList.toggle("show",radarPlaying||LAYERS.radar.on);radarUpdateControls();
-  if(radarPlaying)radarSchedule();else clearTimeout(radarTimer);}
-function radarStep(d){radarPlay(false);radarShow((radarFrame+d+radarCount())%radarCount());}
-document.addEventListener("change",e=>{if(e.target&&e.target.id==="radarSpan")radarSetSpan(+e.target.value);
-  if(e.target&&e.target.id==="radarSpeed"){radarDelay=+e.target.value||650;if(radarPlaying)radarSchedule();}});
+  radarSpanMin=min;
+  // clear old archive layers
+  radarArchive.forEach((_,j)=>{try{map.getLayer("radarA"+j)&&map.removeLayer("radarA"+j);map.getSource("radarA"+j)&&map.removeSource("radarA"+j);}catch(e){}});
+  radarArchive=[];
+  if(min>50){
+    const N=12,step=min/N;
+    for(let j=0;j<N;j++){
+      const t=new Date(now()-(min-j*step)*6e4);
+      t.setUTCMinutes(Math.floor(t.getUTCMinutes()/5)*5,0,0);
+      const ts=t.toISOString().replace(/[-:TZ]/g,"").slice(0,12);
+      radarArchive.push({ts,label:(min-j*step)>=60?((min-j*step)/60).toFixed(1)+" h ago":(min-j*step)+" min ago"});
+      map.addSource("radarA"+j,{type:"raster",tileSize:256,
+        tiles:[`https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-${ts}/{z}/{x}/{y}.png`]});
+      map.addLayer({id:"radarA"+j,type:"raster",source:"radarA"+j,
+        layout:{visibility:"none"},paint:{"raster-opacity":0.72}},"county-lines");}
+    ledger("IEM NEXRAD archive","mesonet.agron.iastate.edu",`radar span ${min>=60?min/60+" h":min+" min"} — 12 archived frames (EXPERIMENTAL)`,"OK","MEASURED","archive frames can have gaps; missing imagery = archive gap, not new weather");
+  }
+  radarFrame=(min>50?radarArchive.length:RADAR_FRAMES.length)-1;radarShow(radarFrame);}
+function radarShow(i){
+  if(radarSpanMin>50){
+    RADAR_FRAMES.forEach((_,j)=>{try{map.getLayer("radar"+j)&&map.setLayoutProperty("radar"+j,"visibility","none");}catch(e){}});
+    radarArchive.forEach((f,j)=>{try{map.getLayer("radarA"+j)&&map.setLayoutProperty("radarA"+j,"visibility",j===i&&LAYERS.radar.on?"visible":"none");}catch(e){}});
+    $("radarLbl")&&($("radarLbl").textContent=radarArchive[i]?radarArchive[i].label+" (archive)":"");
+    return;}
+  $("radarLbl")&&($("radarLbl").textContent="");radarShowLive(i);}
+document.addEventListener("change",e=>{if(e.target&&e.target.id==="radarSpan")radarSetSpan(+e.target.value);});
 document.addEventListener("input",e=>{if(e.target&&e.target.id==="radarOpacity"){const v=+e.target.value;
-    RADAR_FRAMES.forEach((_,j)=>{try{map.getLayer("radar"+j)&&map.setPaintProperty("radar"+j,"raster-opacity",j===radarFrame?v:0);}catch(x){}});
-    radarArchive.forEach((_,j)=>{try{map.getLayer("radarA"+j)&&map.setPaintProperty("radarA"+j,"raster-opacity",j===radarFrame?v:0);}catch(x){}});}
-  if(e.target&&e.target.id==="radarScrub"){radarPlay(false);radarShow(+e.target.value);}});
-$("radarBack").addEventListener("click",()=>radarStep(-1));$("radarNext").addEventListener("click",()=>radarStep(1));
+  RADAR_FRAMES.forEach((_,j)=>{try{map.getLayer("radar"+j)&&map.setPaintProperty("radar"+j,"raster-opacity",v);}catch(x){}});
+  radarArchive.forEach((_,j)=>{try{map.getLayer("radarA"+j)&&map.setPaintProperty("radarA"+j,"raster-opacity",v);}catch(x){}});}});
+function radarPlay(on){
+  radarPlaying=on;$("radarBar").classList.toggle("show",on||LAYERS.radar.on);
+  clearInterval(radarTimer);
+  if(on){radarTimer=setInterval(()=>{radarFrame=(radarFrame+1)%radarCount();
+    radarShow(radarFrame);},radarFrame===radarCount()-1?1400:450);
+    $("btnRadarPause").textContent="⏸";}
+  else{radarFrame=radarCount()-1;if(LAYERS.radar.on)radarShow(radarFrame);$("btnRadarPause").textContent="▶";}}
 
 /* ---------- ambient rotation: the always-on beautiful globe ---------- */
 let ambientRAF=null,lastInteract=0,userBusy=false;
@@ -909,7 +850,6 @@ async function scanPower(){
    ===================================================================== */
 const LAYERS={
   radar:{name:"Live Radar (NEXRAD, US)",color:"#3fa9f5",on:true,badge:"MEASURED",info:"radar",maps:["radar"+(RADAR_FRAMES.length-1)]},
-  lightning:{name:"Recent Lightning (keyed)",color:"#ffcf4a",on:true,badge:"MEASURED",info:"lightning",maps:["lightning","lightning-zone","lightning-zone-fill"]},
   alerts:{name:"Weather Alerts (US)",color:"#d96a5b",on:true,badge:"OFFICIAL",info:"alerts",maps:["alertpolys","alertlines"]},
   quakes:{name:"Earthquakes",color:"#e0b24b",on:true,badge:"MEASURED",info:"quakes",maps:["quakes"]},
   fires:{name:"Active Fires (FIRMS)",color:"#ff7a3c",on:true,badge:"MEASURED",info:"fires",maps:["fires"]},
@@ -946,13 +886,12 @@ document.addEventListener("click",e=>{const s=e.target.closest(".sw[data-layer]"
   const L=LAYERS[s.dataset.layer];L.on=!L.on;applyLayerVisibility();renderLayerList();
   if(s.dataset.layer==="traffic")ensureTraffic();
   if(s.dataset.layer==="ships")shipsConnect();
-  if(s.dataset.layer==="lightning"&&L.on)runAdapter("lightning",true);
   if(s.dataset.layer==="flow"&&L.on)runAll(true);});
 
 /* ---- Road traffic: TomTom flow tiles (free key). Current speeds only — TomTom keeps no public history. ---- */
 function ensureTraffic(){
   if(!LAYERS.traffic.on)return;
-  if(!cfg.tomtomKey){ledger("TomTom","","traffic layer needs a free key — add in ⚙ Key Vault","OFF","UNAVAILABLE","developer.tomtom.com, ~2500 tiles/day free");wd("traffic","off","no key");return;}
+  if(!cfg.tomtomKey){ledger("TomTom","","traffic layer needs a free key — add in ⚙ Key Vault","OFF","UNAVAILABLE","developer.tomtom.com, ~2500 tiles/day free");wd("traffic","gray","no key");return;}
   if(!map.getSource("traffic")){
     map.addSource("traffic",{type:"raster",tileSize:256,
       tiles:["https://api.tomtom.com/traffic/map/4/tile/flow/relative0/{z}/{x}/{y}.png?key="+encodeURIComponent(cfg.tomtomKey)]});
@@ -965,7 +904,7 @@ let aisWS=null,aisSubTimer=null;
 function shipsConnect(){
   if(!LAYERS.ships.on){if(aisWS){try{aisWS.close();}catch(e){}aisWS=null;}return;}
   if(typeof WebSocket==="undefined")return;
-  if(!cfg.aisKey){ledger("AISStream","","ships layer needs a free key — add in ⚙ Key Vault","OFF","UNAVAILABLE","aisstream.io — free, instant");wd("ships","off","no key");return;}
+  if(!cfg.aisKey){ledger("AISStream","","ships layer needs a free key — add in ⚙ Key Vault","OFF","UNAVAILABLE","aisstream.io — free, instant");wd("ships","gray","no key");return;}
   if(aisWS)try{aisWS.close();}catch(e){}
   aisWS=new WebSocket("wss://stream.aisstream.io/v0/stream");
   aisWS.onopen=()=>{aisSubscribe();ledger("AISStream","stream.aisstream.io","connected","OK","MEASURED","volunteer terrestrial AIS — coastal coverage; open ocean gaps are normal");wd("ships","ok","live");};
@@ -1174,7 +1113,6 @@ document.addEventListener("click",e=>{const f=e.target.closest("[data-followobj]
   if(f){const[t,...rest]=f.dataset.followobj.split("§");followObj(t,rest[0],rest[1]||rest[0]);}});
 ["dragstart","zoomstart","rotatestart","pitchstart"].forEach(ev=>map.on(ev,e=>{if(e&&e.originalEvent)cancelFollow("manual "+ev.replace("start",""));}));
 function setFollowISS(on){
-  const wasOn=followISS;
   if(on&&followTarget)stopFollowObj();
   if(on&&aeOpen){navSuppress=true;setView("globe",{keepCam:true});navSuppress=false;} // follow needs the tile camera — mode switch is automatic and graceful
   followISS=on;$("btnFollowISS").classList.toggle("on",on);
@@ -1191,8 +1129,9 @@ function setFollowISS(on){
       if(p)map.easeTo({center:[p.lon,p.lat],zoom:Math.max(map.getZoom(),3),duration:1900,essential:true});};
     step();followTimer=setInterval(step,2000);
     ledger("Follow ISS","","camera locked to ISS (SGP4-propagated between fixes)","OK","MODELED","drag the map to release; positions km-scale accurate");
-  }else if(wasOn)ledger("Follow ISS","","released","OK","OFFICIAL","");}
+  }else ledger("Follow ISS","","released","OK","OFFICIAL","");}
 $("btnFollowISS").addEventListener("click",e=>{if(e.target.closest(".ibtn"))return;setFollowISS(!followISS);});
+map.on("dragstart",e=>{if(e&&e.originalEvent&&followISS)setFollowISS(false);}); // your hand beats the autopilot
 
 /* ---- Power-flow line animation: moving dashes show direction (representation, not literal electrons) ---- */
 const FLOW_DASH=[[0,2,3],[1,2,2],[2,2,1],[3,2,0]];let flowStep=0;
@@ -1237,32 +1176,28 @@ quakes:{name:"USGS Earthquakes",int:300,staleSec:1200,enabled:()=>true,
   ledger("USGS","earthquake.usgs.gov",S.quakes.length+" quakes (24h)","OK","MEASURED","early magnitudes get revised");}},
 alerts:{name:"NWS Alerts",int:180,staleSec:900,enabled:()=>true,
  run:async()=>{
-  const fetchPoint=async(lat,lon,flags)=>{const rp=await fetch(`https://api.weather.gov/alerts/active?point=${lat.toFixed(3)},${lon.toFixed(3)}`,{headers:{"Accept":"application/geo+json"}});
-    if(!rp.ok)throw new Error("point alerts HTTP "+rp.status);const jp=await rp.json();return (jp.features||[]).map(f=>({event:f.properties.event,sev:f.properties.severity,
-      headline:f.properties.headline,area:f.properties.areaDesc,ends:f.properties.ends,desc:f.properties.description,sender:f.properties.senderName,geom:f.geometry,...flags}));};
-  const atHome=haversine(S.loc.lat,S.loc.lon,cfg.home.lat,cfg.home.lon)<1;
-  const local=await fetchPoint(S.loc.lat,S.loc.lon,{local:true,home:atHome});
-  const home=atHome?[]:await fetchPoint(cfg.home.lat,cfg.home.lon,{home:true});
-  let national=[];try{const rn=await fetch("https://api.weather.gov/alerts/active?severity=Extreme,Severe&limit=180",{headers:{"Accept":"application/geo+json"}});
-    if(rn.ok){const jn=await rn.json();national=(jn.features||[]).filter(f=>f.geometry).map(f=>({event:f.properties.event,sev:f.properties.severity,headline:f.properties.headline,area:f.properties.areaDesc,geom:f.geometry}));}}catch(e){}
-  const by=new Map();for(const a of [...local,...home,...national]){const k=(a.headline||a.event||"")+"|"+(a.area||"");const old=by.get(k);if(old){old.local=old.local||a.local;old.home=old.home||a.home;if(!old.geom&&a.geom)old.geom=a.geom;}else by.set(k,a);}S.alerts=[...by.values()];
-  gj("alertpolys");FRESH.alerts=now();ledger("NWS","api.weather.gov",`${local.length} focused + ${home.length||(atHome?local.length:0)} home + ${national.length} national severe alerts`,"OK","OFFICIAL","home watch alerts are fetched independently from the viewed location; county alerts may lack polygons");}},
+  const rp=await fetch(`https://api.weather.gov/alerts/active?point=${S.loc.lat.toFixed(3)},${S.loc.lon.toFixed(3)}`,
+    {headers:{"Accept":"application/geo+json"}});
+  if(!rp.ok)throw new Error("HTTP "+rp.status);
+  const jp=await rp.json();
+  const local=(jp.features||[]).map(f=>({event:f.properties.event,sev:f.properties.severity,
+    headline:f.properties.headline,area:f.properties.areaDesc,ends:f.properties.ends,
+    desc:f.properties.description,sender:f.properties.senderName,geom:f.geometry,local:true}));
+  let national=[];
+  try{const rn=await fetch("https://api.weather.gov/alerts/active?severity=Extreme,Severe&limit=180",
+    {headers:{"Accept":"application/geo+json"}});
+    if(rn.ok){const jn=await rn.json();
+      national=(jn.features||[]).filter(f=>f.geometry).map(f=>({event:f.properties.event,sev:f.properties.severity,
+        headline:f.properties.headline,area:f.properties.areaDesc,geom:f.geometry}));}}catch(e){}
+  const seen=new Set(local.map(a=>a.headline));
+  S.alerts=[...local,...national.filter(a=>!seen.has(a.headline))];
+  gj("alertpolys");FRESH.alerts=now();
+  ledger("NWS","api.weather.gov",`${local.length} local + ${national.length} national severe alerts`,"OK","OFFICIAL","county alerts may lack polygons");}},
 meteo:{name:"Open-Meteo Conditions",int:600,staleSec:2400,enabled:()=>true,
- run:async()=>{const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${S.loc.lat}&longitude=${S.loc.lon}&current=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,wind_speed_10m,wind_gusts_10m&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,wind_gusts_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset&forecast_days=7&timezone=auto&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch`);
+ run:async()=>{const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${S.loc.lat}&longitude=${S.loc.lon}&current=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,wind_speed_10m,wind_gusts_10m&hourly=temperature_2m,precipitation_probability&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset&forecast_days=7&timezone=auto&temperature_unit=fahrenheit&wind_speed_unit=mph`);
   if(!r.ok)throw new Error("HTTP "+r.status);const j=await r.json();S.meteo=j.current;
   S.wx={hourly:j.hourly,daily:j.daily};FRESH.meteo=now();
-  ledger("Open-Meteo","api.open-meteo.com","model nowcast + hourly + 7-day forecast","OK","MODELED","current fields are model-derived nowcast values; station observations are fetched separately from NWS when available");}},
-lightning:{name:"Weatherbit Recent Lightning",int:900,staleSec:1800,enabled:()=>!!cfg.weatherbitKey&&LAYERS.lightning.on,offNote:"needs Weatherbit key/eligible plan + Lightning layer on",
- run:async()=>{const radius=Math.round(Math.max(10,Math.min(75,cfg.lightningRadius))),mins=Math.round(Math.max(10,Math.min(45,cfg.lightningMinutes)));
-  const u=`https://api.weatherbit.io/v2.0/current/lightning?lat=${S.loc.lat.toFixed(4)}&lon=${S.loc.lon.toFixed(4)}&search_distance_km=${radius}&search_mins=${mins}&limit=200&sort=time&key=${encodeURIComponent(cfg.weatherbitKey)}`;
-  const r=await fetch(u);if(r.status===204){S.lightning=[];S.lightningMeta={count:0,returned:0,radius,mins,t:now()};gj("lightning");gj("lightningzone");FRESH.lightning=now();ledger("Weatherbit Lightning","api.weatherbit.io",`no lightning returned within ${radius} km / ${mins} min`,"OK","MEASURED","quiet result; provider quota still applies");return;}
-  if(!r.ok){let msg="HTTP "+r.status;try{const e=await r.json();if(e.error)msg+=" · "+e.error;}catch(e){}throw new Error(msg);}
-  const j=await r.json(),arr=Array.isArray(j.lightning)?j.lightning:[];
-  S.lightning=arr.map(x=>{let t=Date.parse(x.timestamp_utc||"");if(!isFinite(t)&&x.timestamp_utc)t=Date.parse(x.timestamp_utc+"Z");
-    const past=Number.isFinite(+x.past_mins)?+x.past_mins:(isFinite(t)?(now()-t)/6e4:0);return{id:x.id,lat:+x.lat,lon:+x.lon,pastMins:past,distanceKm:Number.isFinite(+x.distance_km)?+x.distance_km:haversine(S.loc.lat,S.loc.lon,+x.lat,+x.lon),source:x.source||"unknown",type:x.type||"detection",t:isFinite(t)?t:now()-past*6e4};
-  }).filter(x=>isFinite(x.lat)&&isFinite(x.lon)&&x.lat>=-90&&x.lat<=90&&x.lon>=-180&&x.lon<=180);
-  S.lightningMeta={count:Number.isFinite(+j.count)?+j.count:S.lightning.length,returned:S.lightning.length,radius,mins,t:now()};gj("lightning");gj("lightningzone");FRESH.lightning=now();
-  ledger("Weatherbit Lightning","api.weatherbit.io",`${S.lightningMeta.count} lightning observations within ${radius} km / ${mins} min (${S.lightning.length} mapped)`,"OK","MEASURED","source may be satellite GLM or radar estimate; satellite flash does not prove ground strike; provider quota applies");}},
+  ledger("Open-Meteo","api.open-meteo.com","conditions + hourly + 7-day forecast","OK","MEASURED/MODELED","current = model nowcast; forecast = model, verify big decisions against NWS point forecast");}},
 nwsobs:{name:"NWS Station Observation",int:900,staleSec:5400,enabled:()=>S.loc.lat>24&&S.loc.lat<50&&S.loc.lon>-125&&S.loc.lon<-66,offNote:"US locations only",
  run:async()=>{
   const r=await fetch(`https://api.weather.gov/points/${S.loc.lat.toFixed(4)},${S.loc.lon.toFixed(4)}`);
@@ -1363,8 +1298,8 @@ eiaflow:{name:"EIA Interchange (power flow)",int:900,staleSec:5400,enabled:()=>!
     const A=BA_CENTROIDS[row.fromba],B=BA_CENTROIDS[row.toba];if(!A||!B)continue;
     const key=[row.fromba,row.toba].sort().join("~");if(seen.has(key))continue;seen.add(key);
     let mw=+row.value;if(!isFinite(mw)||Math.abs(mw)<25)continue;
-    let a={lat:A[0],lon:A[1],name:A[2]},b={lat:B[0],lon:B[1],name:B[2]},from=row.fromba,to=row.toba;
-    if(mw<0){const t=a;a=b;b=t;from=row.toba;to=row.fromba;mw=-mw;} // normalize: line always drawn exporter → importer
+    let a=A,b=B,from=row.fromba,to=row.toba;
+    if(mw<0){a=B;b=A;from=row.toba;to=row.fromba;mw=-mw;} // normalize: line always drawn exporter → importer
     flows.push({a,b,from,to,mw});}
   S.flows=flows;gj("flow");FRESH.flow=now();
   ledger("EIA-930 Interchange","api.eia.gov",flows.length+" active BA-to-BA flows","OK","MEASURED","hourly, 1–2 h lag; drawn between region centroids (MODELED positions); animation = direction, not literal electrons");}},
@@ -1406,7 +1341,6 @@ const FEEDMETA={ // short label, official site to view the same data yourself, h
  alerts:{lbl:"Alerts",url:"https://www.weather.gov/",alt:"US-official; no equal substitute. If down, check weather.gov directly or NOAA Weather Radio."},
  nwsobs:{lbl:"StationWx",url:"https://www.weather.gov/",alt:"Nearest NWS/ASOS station — a real thermometer. If it disagrees with the model row, trust the station."},
  meteo:{lbl:"Weather",url:"https://open-meteo.com/",alt:"Model-based; NWS point forecast (forecast.weather.gov) is the official alternative."},
- lightning:{lbl:"Lightning",url:"https://www.star.nesdis.noaa.gov/goes/conus_band.php?band=EXTENT3&length=24&sat=G19",alt:"Weatherbit point feed is keyed/plan-dependent. NOAA GLM is the official no-key visual cross-check and includes total lightning, not only ground strikes."},
  kp:{lbl:"Kp",url:"https://www.swpc.noaa.gov/products/planetary-k-index",alt:"NOAA SWPC is the operational source; GFZ Potsdam (kp.gfz-potsdam.de) computes the definitive Kp."},
  wind:{lbl:"SolarWind",url:"https://www.swpc.noaa.gov/products/real-time-solar-wind",alt:"Same DSCOVR data is on the SWPC dashboard directly."},
  xray:{lbl:"X-ray",url:"https://www.swpc.noaa.gov/products/goes-x-ray-flux",alt:"GOES X-ray plots on SWPC directly."},
@@ -1462,16 +1396,13 @@ function applyMock(on){
     S.quakes=[{mag:4.6,place:"12 km NW of Sample, OK (MOCK)",t:t-2*36e5,lon:-97.9,lat:34.4,depth:6,mock:true},
               {mag:2.9,place:"Sample cluster (MOCK)",t:t-9e5,lon:-97.7,lat:33.5,depth:4,mock:true}];
     S.fires=[{lat:33.5,lon:-98.1,conf:"h",when:"(MOCK)",sat:"MOCK",mock:true}];
-    S.lightning=[{id:"mock1",lat:33.36,lon:-97.72,pastMins:2.5,distanceKm:18,source:"MOCK",type:"flash",t:t-150000,mock:true},
-      {id:"mock2",lat:33.12,lon:-97.42,pastMins:11,distanceKm:29,source:"MOCK",type:"flash",t:t-660000,mock:true}];
-    S.lightningMeta={count:2,returned:2,radius:cfg.lightningRadius,mins:cfg.lightningMinutes,t};
     S.alerts=[{event:"Heat Advisory (MOCK)",sev:"Moderate",headline:"SAMPLE — labeled mock",area:"Wise County, TX (SAMPLE)",
       sender:"MOCK",mock:true,geom:{type:"Polygon",coordinates:[[[-98.2,33.0],[-97.2,33.0],[-97.2,33.7],[-98.2,33.7],[-98.2,33.0]]]}}];
     S.kp={v:5.3,t:now()};S.wind={speed:612,dens:4.2,t:now()};S.xray={flux:2.3e-5,t:now()};S.imf={bz:-8.4,bt:12.1,t:now()};
     S.ba={ERCO:{code:"ERCO",name:"ERCOT (MOCK)",lat:31.2,lon:-99.3,d:71000,df:66000,period:"MOCK"}};
     ledger("MOCK MODE","","sample data injected — ALL items tagged MOCK","OK","MOCK","demo only");
-  }else{S.quakes=[];S.fires=[];S.lightning=[];S.lightningMeta=null;S.alerts=[];S.ba={};ledger("MOCK MODE","","cleared — resuming live fetches","OK","OFFICIAL","");}
-  ["quakes","fires","lightning","lightningzone","alertpolys","ba"].forEach(gj);
+  }else{S.quakes=[];S.fires=[];S.alerts=[];S.ba={};ledger("MOCK MODE","","cleared — resuming live fetches","OK","OFFICIAL","");}
+  ["quakes","fires","alertpolys","ba"].forEach(gj);
   runAnomalyEngine();renderAll();
   if(!on)runAll(true);}
 
@@ -1494,11 +1425,6 @@ function runAnomalyEngine(){
     "GOES X-ray flux at M/X level. Possible shortwave radio fade on the daylit side of Earth during the flare.",
     "NOAA SWPC/GOES","Flare location on the Earth-facing disk (DONKI) determines whether follow-on effects matter.");
   if(loc){
-    const closeL=S.lightning.filter(x=>x.pastMins<=10&&haversine(loc.lat,loc.lon,x.lat,x.lon)<=16.1).sort((a,b)=>a.distanceKm-b.distanceKm);
-    if(closeL.length){const x=closeL[0],mi=haversine(loc.lat,loc.lon,x.lat,x.lon)*0.621371;
-      push(mi<=5?3:2,"HIGH",`Recent lightning ${mi.toFixed(1)} mi from ${loc.name.split(",")[0]}`,
-        `${closeL.length} returned flash/detection(s) within 10 mi during the last 10 minutes. This is immediate proximity evidence, not a claim that every flash reached the ground.`,
-        `Weatherbit / ${x.source||"provider"}`,"Continued detections moving closer, or an official NWS warning naming the storm, would increase concern.",{lon:x.lon,lat:x.lat,z:10});}
     const nearQ=S.quakes.filter(q=>haversine(loc.lat,loc.lon,q.lat,q.lon)<300);
     const big=nearQ.filter(q=>q.mag>=4);
     if(big.length)push(2,"HIGH",`M${big[0].mag.toFixed(1)} earthquake within 300 mi of ${loc.name.split(",")[0]}`,
@@ -1518,7 +1444,7 @@ function runAnomalyEngine(){
   const stressed=Object.values(S.ba).filter(b=>b.d&&b.df&&b.d/b.df>1.05);
   for(const b of stressed.slice(0,4))push(2,"MEDIUM",`${b.code} demand ${((b.d/b.df-1)*100).toFixed(1)}% above its own forecast`,
     `${b.name}: hourly demand exceeding day-ahead forecast. Operators handle this routinely; flagged because the gap is large. Correlation hypothesis, not an outage prediction.`,
-    "EIA-930","Reserve-margin data (not public in EIA-930) or an operator conservation appeal would increase confidence.",Number.isFinite(b.lon)&&Number.isFinite(b.lat)?{lon:b.lon,lat:b.lat,z:5.4}:null);
+    "EIA-930","Reserve-margin data (not public in EIA-930) or an operator conservation appeal would increase confidence.",BA_CENTROIDS[b.code]?{lon:BA_CENTROIDS[b.code].lon,lat:BA_CENTROIDS[b.code].lat,z:5.4}:null);
   if(S.kp&&S.kp.v>=6&&Object.keys(S.ba).length)push(2,"MEDIUM","Geomagnetic storm while grid monitoring is active",
     "Kp≥6 concurrent with grid observation. Geomagnetically induced currents are possible at storm levels; impact is operator-managed. Watch condition.",
     "SWPC + EIA-930","A NOAA G3+ alert naming grid impacts would increase confidence.");
@@ -1527,7 +1453,7 @@ function runAnomalyEngine(){
   if(stressedBAs.length>=3)push(3,"MEDIUM",`Systemic grid stress: ${stressedBAs.length} balancing authorities above forecast simultaneously`,
     `${stressedBAs.map(b=>b.code).join(", ")} are all running ≥6% over their own demand forecasts in the same hour. Simultaneous multi-region stress usually traces to a shared driver — continental heat/cold, or a data/forecast artifact.`,
     "EIA-930 cross-region comparison","Check the Weather layer for a matching temperature pattern; an EIA data artifact would show as an implausible step-change in the Grid tab.",
-    stressedBAs[0]&&Number.isFinite(stressedBAs[0].lon)&&Number.isFinite(stressedBAs[0].lat)?{lon:stressedBAs[0].lon,lat:stressedBAs[0].lat,z:4}:null);
+    stressedBAs[0]&&BA_CENTROIDS[stressedBAs[0].code]?{lon:BA_CENTROIDS[stressedBAs[0].code].lon,lat:BA_CENTROIDS[stressedBAs[0].code].lat,z:4}:null);
   const geomagActive=(S.kp&&S.kp.v>=6)||(S.imf&&S.imf.bz<=-10);
   if(geomagActive&&stressedBAs.length)push(3,"LOW",`Geomagnetic activity coinciding with grid stress (${stressedBAs.map(b=>b.code).join(", ")})`,
     "A geomagnetic disturbance is in progress while grid regions run above forecast. These are USUALLY unrelated — demand stress is almost always weather-driven — but strong storms (G3+) can induce currents that operators actively manage. This is a co-occurrence note, not a causal claim.",
@@ -1603,7 +1529,6 @@ function renderBrief(){
   const l=S.loc;if(!l){$("brief").textContent="Search a location.";return;}
   const m=moonInfo();const nearestQ=S.quakes.map(q=>({q,d:haversine(l.lat,l.lon,q.lat,q.lon)})).sort((a,b)=>a.d-b.d)[0];
   const nearestF=S.fires.map(f=>({f,d:haversine(l.lat,l.lon,f.lat,f.lon)})).sort((a,b)=>a.d-b.d)[0];
-  const nearestL=S.lightning.map(x=>({x,d:haversine(l.lat,l.lon,x.lat,x.lon)})).sort((a,b)=>a.d-b.d)[0];
   const locAl=S.alerts.filter(a=>a.local);
   $("brief").innerHTML=`<div style="font-size:13px;color:var(--vir3);margin-bottom:5px">${esc(l.name)}</div>
   ${S.meteo?`<div class="brief-metric"><span>Temp / humidity</span><span class="v">${Math.round(S.meteo.temperature_2m)}°F · ${S.meteo.relative_humidity_2m}%</span></div>
@@ -1611,7 +1536,6 @@ function renderBrief(){
   <div class="brief-metric"><span>Feels like</span><span class="v">${S.meteo.apparent_temperature!=null?Math.round(S.meteo.apparent_temperature)+"°F":"—"}</span></div>
   <div class="brief-metric"><span>Wind / gusts</span><span class="v">${Math.round(S.meteo.wind_speed_10m)} / ${Math.round(S.meteo.wind_gusts_10m)} mph</span></div>`:""}
   ${wxExtras()}
-  <div class="brief-metric"><span>Recent lightning</span><span class="v">${cfg.weatherbitKey?(S.lightningMeta?S.lightningMeta.count+" · nearest "+(nearestL?(nearestL.d*0.621371).toFixed(1)+" mi":"none"):"loading") : "key optional"}</span></div>
   <div class="brief-metric"><span>Active NWS alerts here</span><span class="v">${locAl.length}</span></div>
   <div class="brief-metric"><span>Nearest quake (24h)</span><span class="v">${nearestQ?`M${nearestQ.q.mag.toFixed(1)} · ${Math.round(nearestQ.d)} km`:"none"}</span></div>
   <div class="brief-metric"><span>Nearest fire detection</span><span class="v">${nearestF?Math.round(nearestF.d)+" km":cfg.firmsKey?"none":"needs key"}</span></div>
@@ -1620,7 +1544,7 @@ function renderBrief(){
   <div class="brief-metric"><span>X-ray class</span><span class="v">${S.xray?fluxClass(S.xray.flux):"—"}</span></div>
   <div class="brief-metric"><span>Moon <button class="ibtn" data-info="moon">i</button></span><span class="v">${m.name} · ${m.illum}%</span></div>
   <button class="subbtn" id="btnSkyLab">☾ Sky &amp; Eclipse Lab — how phases and eclipses work</button>
-  <div class="finer" style="margin-top:6px">Open-Meteo nowcast <span class="badge b-modeled">MODELED</span>${S.obs?' · station observation <span class="badge b-measured">MEASURED</span>':""} · moon <span class="badge b-modeled">MODELED</span>${S.mock?' · <span class="badge b-mock">MOCK MODE</span>':""}</div>`;}
+  <div class="finer" style="margin-top:6px">Conditions <span class="badge b-measured">MEASURED</span> · moon <span class="badge b-modeled">MODELED</span>${S.mock?' · <span class="badge b-mock">MOCK MODE</span>':""}</div>`;}
 function anomCard(a){return `<div class="anom s${a.sev} ${a.geo?"canfly":""}"${a.geo?` data-fly="${a.geo.lon},${a.geo.lat},${a.geo.z||7}" title="tap: show on map"`:` title="global condition — no single location"`}>
     <b>${a.geo?"◎ ":"🌐 "}${esc(a.title)}</b>${a.mock?' <span class="badge b-mock">MOCK</span>':""}
     <div class="why">${esc(a.why)}</div>
@@ -1731,39 +1655,6 @@ let curTab="alerts";
    Trust tiers: 1 official operational · 2 official dataset/science · 3 aggregator
    · 4 open/crowdsourced · 5 secondary mirror · 6 model/inference · 7 user journal
    ===================================================================== */
-
-function lightningStats(){const L=S.lightning.slice().sort((a,b)=>a.pastMins-b.pastMins),nearest=L.slice().sort((a,b)=>a.distanceKm-b.distanceKm)[0];
-  const recentL=L.filter(x=>x.pastMins<=10),priorL=L.filter(x=>x.pastMins>10&&x.pastMins<=20),recent=recentL.length,prior=priorL.length;
-  let activity="insufficient sample";if(recent+prior>=4)activity=recent>=prior*1.6?"activity increasing":prior>=recent*1.6?"activity decreasing":"activity roughly steady";
-  const median=a=>{if(!a.length)return null;const b=a.slice().sort((x,y)=>x-y);return b[Math.floor(b.length/2)];},rd=median(recentL.map(x=>x.distanceKm)),pd=median(priorL.map(x=>x.distanceKm));
-  let range="distance trend unavailable";if(rd!=null&&pd!=null&&recent>=2&&prior>=2)range=rd<pd-5?"detections trending closer":rd>pd+5?"detections trending farther":"distance roughly steady";
-  return{L,nearest,recent,prior,activity,range,total:S.lightningMeta?S.lightningMeta.count:L.length};}
-function wxCodeLabel(c){return({0:"Clear",1:"Mainly clear",2:"Partly cloudy",3:"Overcast",45:"Fog",48:"Rime fog",51:"Light drizzle",53:"Drizzle",55:"Heavy drizzle",61:"Light rain",63:"Rain",65:"Heavy rain",71:"Light snow",73:"Snow",75:"Heavy snow",80:"Rain showers",81:"Showers",82:"Heavy showers",95:"Thunderstorm",96:"Thunderstorm + hail",99:"Strong thunderstorm + hail"})[c]||("Code "+c);}
-function renderLightningMini(){const el=$("lightningMini");if(!el)return;const st=lightningStats();
-  el.innerHTML=cfg.weatherbitKey?(S.lightningMeta?`⚡ ${st.total} in ${cfg.lightningMinutes} min / ${cfg.lightningRadius} km · ${st.nearest?(st.nearest.distanceKm*0.621371).toFixed(1)+" mi nearest":"none"}`:"Lightning loading…"):
-    `⚡ Point lightning off — add Weatherbit key in ⚙. NOAA GLM visual remains available in WEATHER.`;}
-function renderWeatherTab(B){const st=lightningStats(),m=S.meteo||{},obs=S.obs,H=S.wx&&S.wx.hourly,D=S.wx&&S.wx.daily;
-  let hourly="";if(H&&H.time){const nowH=new Date().toISOString().slice(0,13);let i=H.time.findIndex(t=>t.slice(0,13)>=nowH);if(i<0)i=0;
-    hourly=`<table><tr><th>Hour</th><th>Conditions</th><th>Temp</th><th>Precip</th><th>Wind / gust</th></tr>`+H.time.slice(i,i+12).map((t,j)=>{const k=i+j;return`<tr><td>${new Date(t).toLocaleTimeString([],{hour:"numeric"})}</td><td>${wxCodeLabel(H.weather_code&&H.weather_code[k])}</td><td>${Math.round(H.temperature_2m[k])}°F</td><td>${H.precipitation_probability[k]}%${H.precipitation?" · "+(+H.precipitation[k]).toFixed(2)+" in":""}</td><td>${H.wind_speed_10m?Math.round(H.wind_speed_10m[k]):"—"} / ${H.wind_gusts_10m?Math.round(H.wind_gusts_10m[k]):"—"} mph</td></tr>`;}).join("")+"</table>";}
-  const strikes=st.L.length?`<table><tr><th>Age</th><th>Distance</th><th>Source/type</th><th>Location</th></tr>`+st.L.slice(0,40).map(x=>`<tr data-fly="${x.lon},${x.lat},10" style="cursor:pointer"><td>◎ ${x.pastMins.toFixed(1)} min</td><td>${(x.distanceKm*0.621371).toFixed(1)} mi</td><td>${esc(x.source)} · ${esc(x.type)}</td><td>${x.lat.toFixed(3)}, ${x.lon.toFixed(3)}</td></tr>`).join("")+"</table>":`<div class="finer">${cfg.weatherbitKey?(S.lightningMeta?"No recent detections returned inside this radius/time window.":"Waiting for lightning fetch…"):"Point locations require a Weatherbit key and eligible plan. NOAA GLM visual cross-check below requires no key."}</div>`;
-  B.innerHTML=`<div style="font-size:14px;color:var(--vir3)">☁ Weather Core · ${esc(S.loc.name)}</div>
-  <div class="wxgrid"><div class="wxcard"><div class="finer">MODEL NOWCAST</div><div class="big">${m.temperature_2m!=null?Math.round(m.temperature_2m)+"°F":"—"}</div><div>${m.weather_code!=null?wxCodeLabel(m.weather_code):""} · feels ${m.apparent_temperature!=null?Math.round(m.apparent_temperature)+"°":"—"}</div><div class="finer">Open-Meteo · MODELED</div></div>
-  <div class="wxcard"><div class="finer">NEAREST STATION</div><div class="big">${obs&&obs.t!=null?Math.round(obs.t*9/5+32)+"°F":"—"}</div><div>${obs?esc(obs.txt||obs.station||""):"US observation unavailable"}</div><div class="finer">NWS/ASOS · MEASURED</div></div>
-  <div class="wxcard"><div class="finer">ACTIVE ALERTS HERE</div><div class="big">${S.alerts.filter(a=>a.local).length}</div><div>${S.alerts.filter(a=>a.local).slice(0,1).map(a=>esc(a.event)).join("")||"none active"}</div><div class="finer">NWS · OFFICIAL</div></div>
-  <div class="wxcard"><div class="finer">LIGHTNING WINDOW</div><div class="big">${cfg.weatherbitKey?(S.lightningMeta?st.total:"…"):"KEY"}</div><div>${st.nearest?`${(st.nearest.distanceKm*0.621371).toFixed(1)} mi nearest · ${st.nearest.pastMins.toFixed(1)} min ago`:cfg.weatherbitKey?"none returned":"optional keyed feed"}</div><div class="finer">${st.activity} · ${st.range}</div></div></div>
-  <div class="wxbar"><button class="hbtn on" id="wxRadar">▶ Radar timeline</button><button class="hbtn" id="wxRefresh">↻ Refresh weather</button><button class="hbtn" id="wxGlm">⚡ NOAA GLM official viewer ↗</button>
-  <label class="finer">Lightning radius <select id="wxRadius">${[25,50,75].map(v=>`<option value="${v}" ${cfg.lightningRadius===v?"selected":""}>${v} km</option>`).join("")}</select></label>
-  <label class="finer">Lookback <select id="wxMinutes">${[15,30,45].map(v=>`<option value="${v}" ${cfg.lightningMinutes===v?"selected":""}>${v} min</option>`).join("")}</select></label></div>
-  <div class="wxlegend"><span style="--c:#ff496c">≤5 min</span><span style="--c:#ffb84d">6–15 min</span><span style="--c:#ffe56b">older in window</span><span>Dashed ring = query radius</span></div>
-  <div class="finer">Lightning points are flash/detection locations, not guaranteed cloud-to-ground strikes. Activity compares the latest 10 minutes with the prior 10; distance trend compares their median ranges when both samples are large enough. Neither is a storm-arrival prediction.</div>
-  <h2>Recent Lightning</h2>${strikes}<h2>Next 12 Hours <span class="badge b-modeled">MODELED</span></h2>${hourly||'<div class="finer">Forecast loading…</div>'}
-  <div class="finer" style="margin-top:6px">Radar: NOAA NEXRAD mosaic via IEM <span class="badge b-measured">MEASURED</span> · alerts: NWS <span class="badge b-official">OFFICIAL</span> · point lightning: Weatherbit/provider source retained <span class="badge b-measured">MEASURED</span> · forecast: Open-Meteo <span class="badge b-modeled">MODELED</span>.</div>`;
-  $("wxRadar").addEventListener("click",()=>{LAYERS.radar.on=true;applyLayerVisibility();renderLayerList();radarPlay(true);});
-  $("wxRefresh").addEventListener("click",()=>{runAdapter("alerts",true);runAdapter("meteo",true);runAdapter("nwsobs",true);runAdapter("lightning",true);});
-  $("wxGlm").addEventListener("click",()=>window.open("https://www.star.nesdis.noaa.gov/goes/conus_band.php?band=EXTENT3&length=24&sat=G19","_blank","noopener"));
-  $("wxRadius").addEventListener("change",e=>{cfg.lightningRadius=+e.target.value;store.set("lightningRadius",cfg.lightningRadius);gj("lightningzone");runAdapter("lightning",true);});
-  $("wxMinutes").addEventListener("change",e=>{cfg.lightningMinutes=+e.target.value;store.set("lightningMinutes",cfg.lightningMinutes);runAdapter("lightning",true);});}
-
 const REGISTRY=[
  // ---- POWER GRID ----
  {m:"grid",id:"eia930",n:"EIA Hourly Grid Monitor (EIA-930)",t:1,st:"LIVE (keyed)",u:"https://www.eia.gov/electricity/gridmonitor/",w:"Official but hourly + 1-2h lag. Aggregated BA level — not substation telemetry."},
@@ -1805,8 +1696,6 @@ const REGISTRY=[
  {m:"earth",id:"donki",n:"NASA DONKI event notifications",t:2,st:"LIVE (DEMO_KEY)",u:"https://kauai.ccmc.gsfc.nasa.gov/DONKI/",w:"Analyst-issued notices; DEMO_KEY rate-limits."},
  {m:"earth",id:"usgsmag",n:"USGS Geomagnetism observatories",t:2,st:"STUB",u:"https://www.usgs.gov/programs/geomagnetism/data",w:"US magnetometer web service exists; adapter slot reserved (response format/CORS verification pending — will not ship half-tested)."},
  {m:"earth",id:"intermagnet",n:"INTERMAGNET global observatories",t:2,st:"LINK",u:"https://www.intermagnet.org/",w:"Access method and licensing vary per station."},
- {m:"earth",id:"weatherbit_lightning",n:"Weatherbit Current Lightning",t:3,st:"LIVE (keyed/plan-dependent)",u:"https://www.weatherbit.io/api/lightning-current",w:"Returns recent flash/detection locations around a point. Provider quota applies; satellite flashes may be in-cloud, not necessarily ground strikes."},
- {m:"earth",id:"noaa_glm",n:"NOAA GOES-19 GLM Flash Extent Density",t:1,st:"LINK",u:"https://www.star.nesdis.noaa.gov/goes/conus_band.php?band=EXTENT3&length=24&sat=G19",w:"Official total-lightning visualization updated in short frames; density imagery is a visual cross-check, not individual ground-strike classification."},
  {m:"earth",id:"blitz",n:"Blitzortung live lightning",t:4,st:"LINK",u:"https://map.blitzortung.org/",w:"Community network; their data terms prohibit third-party apps from consuming the live feed — so this app links rather than takes. Coverage varies by region."},
  {m:"earth",id:"wwlln",n:"WWLLN global lightning",t:2,st:"LINK",u:"https://wwlln.net/",w:"Research network; data by arrangement, not open API. Lightning DRIVES Schumann resonance but lightning density ≠ Schumann amplitude."},
  {m:"earth",id:"wwllnhist",n:"NASA WWLLN thunder-hour climatology",t:2,st:"LINK",u:"https://www.earthdata.nasa.gov/data/catalog/ghrc-daac-wwllnmth-1",w:"Historical baseline dataset."},
@@ -1818,8 +1707,7 @@ const REGISTRY=[
 ];
 function renderTab(){
   const B=$("tabBody");
-  if(curTab==="weather"){renderWeatherTab(B);return;}
-  if(curTab==="alerts"){const list=S.alerts.filter(a=>a.local||a.home||a.sev==="Extreme"||a.sev==="Severe");
+  if(curTab==="alerts"){const list=S.alerts.filter(a=>a.local||a.sev==="Extreme"||a.sev==="Severe");
     const cl=alertClusters();
     const clBar=cl.length?`<div class="row" style="flex-wrap:wrap;gap:4px;margin-bottom:6px">
       ${cl.slice(0,6).map((c,i)=>`<button class="hbtn" data-cluster="${i}" title="fly to the weighted center and pulse every alert in it">◎ Cluster ${i+1} · ${c.pts.length} alert(s)</button>`).join("")}
@@ -1879,25 +1767,12 @@ function renderTab(){
       ledger("Journal","","entry added (TIER 7 — subjective)","OK","USER","kept separate from measured data");});}
   if(curTab==="sources")B.innerHTML=`<div class="finer" style="line-height:1.8">
     <b style="color:var(--vir2)">Attribution & integrity.</b><br>
-    Basemap © OpenStreetMap contributors (ODbL) · Radar: NOAA NEXRAD via Iowa Environmental Mesonet · Lightning points: Weatherbit (optional keyed/plan-dependent) · Lightning visual cross-check: NOAA GOES GLM · Earthquakes: USGS · Weather alerts: National Weather Service · Weather nowcast/forecast: Open-Meteo (MODELED) · NWS station observations (MEASURED) · Space weather: NOAA SWPC + NASA DONKI · Fires: NASA FIRMS · ISS: WhereTheISS.at · Aircraft: OpenSky Network · Grid: US EIA-930 · Power infrastructure: OpenStreetMap via Overpass (ODbL) · Rendering: MapLibre GL (BSD-3, vendored v5.24, license file in repo).<br><br>
+    Basemap © OpenStreetMap contributors (ODbL) · Radar: NOAA NEXRAD via Iowa Environmental Mesonet · Earthquakes: USGS · Weather alerts: National Weather Service · Conditions: Open-Meteo · Space weather: NOAA SWPC + NASA DONKI · Fires: NASA FIRMS · ISS: WhereTheISS.at · Aircraft: OpenSky Network · Grid: US EIA-930 · Power infrastructure: OpenStreetMap via Overpass (ODbL) · Rendering: MapLibre GL (BSD-3, vendored v5.24, license file in repo).<br><br>
     Every fetch is logged in the Truth Ledger with source, time, status, confidence class, and known limits. No prediction is worded as certainty unless the source itself is an official alert. This app claims no private grid topology, no substation vulnerability, no non-public outage prediction, and contains no scanning or probing capability of any kind. Schumann resonance remains honestly unavailable: no reliable public API exists, and this app will not fake one.</div>`;}
 document.querySelectorAll(".tab").forEach(t=>t.addEventListener("click",e=>{
   if(e.target.closest(".ibtn"))return; // ⓘ inside a tab opens the explainer without switching tabs
-  activateTab(t.dataset.tab);}));
-
-let weatherMode=false,weatherLayerSnapshot=null;
-function activateTab(name){document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on",t.dataset.tab===name));curTab=name;renderTab();}
-function setWeatherMode(on){weatherMode=!!on;document.body.classList.toggle("wxmode",weatherMode);$("btnWeather").classList.toggle("on",weatherMode);
-  if(weatherMode){weatherLayerSnapshot=Object.fromEntries(Object.entries(LAYERS).map(([k,L])=>[k,L.on]));
-    for(const k in LAYERS)LAYERS[k].on=["radar","lightning","alerts","counties"].includes(k);LAYERS.terminator.on=false;
-    activateTab("weather");if(innerWidth<=900){document.body.classList.add("m-bottom");document.body.classList.remove("m-left","m-right");}
-    runAdapter("alerts",true);runAdapter("meteo",true);runAdapter("nwsobs",true);runAdapter("lightning",true);radarPlay(true);
-    ledger("Weather Core","","focused weather mode entered","OK","OFFICIAL","unrelated layers temporarily hidden; prior layer state preserved");
-  }else{if(weatherLayerSnapshot)for(const k in weatherLayerSnapshot)if(LAYERS[k])LAYERS[k].on=weatherLayerSnapshot[k];weatherLayerSnapshot=null;radarPlay(false);
-    ledger("Weather Core","","weather mode exited; prior layers restored","OK","OFFICIAL","");}
-  applyLayerVisibility();renderLayerList();setTimeout(()=>map.resize(),80);}
-$("btnWeather").addEventListener("click",()=>setWeatherMode(!weatherMode));
-
+  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("on"));t.classList.add("on");
+  curTab=t.dataset.tab;renderTab();}));
 $("btnHelp").addEventListener("click",openHelpIndex);
 /* ---- phone nav: one sheet at a time; Map closes all ---- */
 document.querySelectorAll("[data-mnav]").forEach(b=>b.addEventListener("click",()=>{
@@ -1923,18 +1798,17 @@ $("btnFocus").addEventListener("click",()=>{
    LOCATION + UI WIRES
    ===================================================================== */
 function setLocation(loc,fly=true){cancelFollowSafe("navigated to "+(loc.name||"location"));S.loc=loc;
-  // Clear location-scoped data immediately so the new radius cannot display the prior location's readings.
-  S.meteo=null;S.wx=null;S.obs=null;S.lightning=[];S.lightningMeta=null;S.fires=[];S.alerts=S.alerts.filter(a=>!a.local);
-  ["lightning","lightningzone","fires","alertpolys"].forEach(gj);renderAll();
   if(fly){if(aeOpen)aeGoTo(loc.lat,loc.lon,loc.z||8.6);
     else map.flyTo({center:[loc.lon,loc.lat],zoom:loc.z||8.6,duration:2600});}
   ledger("Location","",'focused: '+loc.name,"OK","OFFICIAL","");
-  gj("lightningzone");runAdapter("alerts",true);runAdapter("meteo",true);runAdapter("nwsobs",true);runAdapter("lightning",true);runAdapter("firms",true);
+  runAdapter("alerts",true);runAdapter("meteo",true);runAdapter("firms",true);
   setTimeout(()=>{runAnomalyEngine();renderAll();},1500);}
 async function doSearch(){const q=$("searchInput").value;if(!q)return;
   const loc=await geocode(q);
-  if(loc){setLocation(loc);$("searchInput").placeholder="Search complete — set as ⌂ HOME in Settings if desired";}
+  if(loc){setLocation(loc);
+    if(confirmHome!==q){$("searchInput").placeholder="Press GO again on same search to keep, or set ⌂ in Settings";}}
   else{$("searchInput").value="";$("searchInput").placeholder="Not found — try ZIP, 'City ST', or lat,lon";}}
+let confirmHome=null;
 $("btnGo").addEventListener("click",doSearch);
 $("searchInput").addEventListener("keydown",e=>{if(e.key==="Enter")doSearch();});
 $("btnHome").addEventListener("click",()=>setLocation({...cfg.home,z:17.5})); // exact saved coords, house-level; Follow cancels via setLocation // house-level; auto-satellite engages ≥16.6
@@ -1944,7 +1818,7 @@ $("btnIntegrity").addEventListener("click",()=>{S.integrity=!S.integrity;
   if(S.integrity&&S.mock)applyMock(false);
   renderAnomalies();ledger("Integrity mode","",S.integrity?"ON — hiding mock/experimental/low-confidence":"off","OK","OFFICIAL","");});
 $("btnMock").addEventListener("click",()=>applyMock(!S.mock));
-$("btnRadarPlay").addEventListener("click",()=>{if(!LAYERS.radar.on){LAYERS.radar.on=true;applyLayerVisibility();renderLayerList();}radarPlay(!radarPlaying);});
+$("btnRadarPlay").addEventListener("click",()=>{if(!LAYERS.radar.on){LAYERS.radar.on=true;applyLayerVisibility();renderLayerList();}radarPlay(true);});
 $("btnRadarPause").addEventListener("click",()=>radarPlay(!radarPlaying));
 $("btnScanPower").addEventListener("click",scanPower);
 /* ============== KEY VAULT + BACKUP (export/import as ONE file) ============== */
@@ -1961,9 +1835,6 @@ const KEYFIELDS=[
  ["tomtomKey","TomTom — road traffic",
   "https://developer.tomtom.com/user/register",
   ["Open the link above and create a free account (email or Google/GitHub)","Verify your email, then sign in","You land on the Dashboard — ignore all the product pages","Left menu → 'API & SDK Keys' (or 'Keys'): a key named 'My first API key' was ALREADY created for you","Click the copy icon next to it, paste here, SAVE","That one key covers the Traffic tiles this app uses — you don't need to pick any product"]],
- ["weatherbitKey","Weatherbit — recent lightning points",
-  "https://www.weatherbit.io/account/create",
-  ["Open the link and create/sign into a Weatherbit account","Confirm that your plan includes the Current Lightning API — access is plan-dependent","Copy your API key from the dashboard","Paste it here and SAVE; Sentinel polls only every 15 minutes to protect quota"]],
  ["aisKey","AISStream — live ships",
   "https://aisstream.io/authenticate",
   ["Open the link above","Click 'Sign in with GitHub' (your mindnummer account works)","Authorize, then on the dashboard press 'Create API Key'","Name it anything, copy the key shown, paste here, SAVE","Then turn on the Ships layer and look at any busy strait or port"]]];
@@ -1981,23 +1852,20 @@ function exportBackup(){download("sentinel-backup.json",{type:"sentinel-backup",
   layers:Object.fromEntries(Object.entries(LAYERS).map(([k,L])=>[k,L.on]))});
   ledger("Vault","","FULL backup exported (keys + bookmarks + presets + layout)","OK","OFFICIAL","");}
 function importFile(cb){const i=document.createElement("input");i.type="file";i.accept=".json,application/json";
-  i.onchange=()=>{const f=i.files[0];if(!f)return;
-    if(f.size>2_000_000){alert("Sentinel import refused: file exceeds the 2 MB safety limit.");return;}
-    const r=new FileReader();
+  i.onchange=()=>{const f=i.files[0];if(!f)return;const r=new FileReader();
     r.onload=()=>{try{cb(JSON.parse(r.result));}catch(e){alert("Not a valid Sentinel file: "+e.message);}};
     r.readAsText(f);};i.click();}
 function applyImport(j){
   if(j.type!=="sentinel-keys"&&j.type!=="sentinel-backup"){alert("Not a Sentinel keys/backup file.");return;}
   if(j.keys)KEYFIELDS.forEach(([k])=>{if(typeof j.keys[k]==="string"){cfg[k]=j.keys[k];store.set(k,cfg[k]);}});
   if(j.type==="sentinel-backup"){
-    if(j.home&&Number.isFinite(+j.home.lat)&&Number.isFinite(+j.home.lon)&&+j.home.lat>=-90&&+j.home.lat<=90&&+j.home.lon>=-180&&+j.home.lon<=180){
-      cfg.home={name:String(j.home.name||"Imported home").slice(0,160),lat:+j.home.lat,lon:+j.home.lon};store.set("home",cfg.home);}
-    if(typeof j.basemap==="string"&&BASEMAPS[j.basemap]){cfg.basemap=j.basemap;store.set("basemap",j.basemap);setBasemap(j.basemap);}
-    if(Array.isArray(j.bookmarks))store.set("bookmarks",j.bookmarks.filter(b=>b&&Number.isFinite(+b.lat)&&Number.isFinite(+b.lon)&&+b.lat>=-90&&+b.lat<=90&&+b.lon>=-180&&+b.lon<=180).slice(0,500).map(b=>({...b,name:String(b.name||"Bookmark").slice(0,160),lat:+b.lat,lon:+b.lon})));
+    if(j.home&&isFinite(j.home.lat)){cfg.home=j.home;store.set("home",j.home);}
+    if(j.basemap){cfg.basemap=j.basemap;store.set("basemap",j.basemap);try{setBasemap(j.basemap);}catch(e){}}
+    if(Array.isArray(j.bookmarks))store.set("bookmarks",j.bookmarks);
     if(j.presets&&typeof j.presets==="object")store.set("presets",j.presets);
     if(typeof j.startup==="string")store.set("startup",j.startup);
     if(Array.isArray(j.journal))store.set("journal",j.journal);
-    if(Array.isArray(j.customKeys))store.set("customKeys",j.customKeys.filter(k=>k&&typeof k.label==="string"&&typeof k.value==="string").slice(0,100).map(k=>({label:k.label.slice(0,120),value:k.value.slice(0,500)})));
+    if(Array.isArray(j.customKeys))store.set("customKeys",j.customKeys);
     if(j.layers)for(const k in j.layers)if(LAYERS[k])LAYERS[k].on=!!j.layers[k];
     applyLayerVisibility();
     renderBookmarks();renderPresets();}
@@ -2005,8 +1873,8 @@ function applyImport(j){
   ledger("Vault","","import applied ("+j.type+")","OK","OFFICIAL","validated shape before applying");}
 $("btnSettings").addEventListener("click",()=>{
   const custom=store.get("customKeys",[]);
-  $("modal").innerHTML=`<h3>⚙ Key Vault &amp; Settings — keys are stored locally and sent only to the selected data provider when that adapter runs</h3>
-  ${KEYFIELDS.map(([k,lbl,url,steps])=>`<label>${lbl} — <a href="${url}" target="_blank" rel="noopener" style="color:var(--vir3)">get key ↗</a></label>
+  $("modal").innerHTML=`<h3>⚙ Key Vault &amp; Settings — everything stays in YOUR browser</h3>
+  ${KEYFIELDS.map(([k,lbl,url,steps])=>`<label>${lbl} — <a href="${url}" target="_blank" rel="noopener" style="color:var(--vir3)">get free key ↗</a></label>
     <input id="set_${k}" value="${esc(cfg[k]||"")}">
     <details class="keyhow"><summary>How to get this key (${steps.length} steps)</summary><ol>${steps.map(s=>`<li>${s}</li>`).join("")}</ol></details>`).join("")}
   <label>Your own keys — add any API key you find, with your label. Stored, exported in backups, ready the moment an adapter uses it. <button class="ibtn" data-info="customkeys">i</button></label>
@@ -2127,7 +1995,7 @@ function checkNotifRules(){
   if(!notifOn||S.mock||typeof Notification==="undefined"||Notification.permission!=="granted")return;
   const h=cfg.home;
   // 1. New official NWS alert at home
-  S.alerts.filter(a=>a.home&&!a.mock).forEach(a=>{const id="al:"+(a.headline||a.event);
+  S.alerts.filter(a=>a.local&&!a.mock).forEach(a=>{const id="al:"+(a.headline||a.event);
     if(!notified.has(id)){rememberNotified(id);notify(a.event||"NWS alert","OFFICIAL · "+(a.headline||a.area||""));}});
   // 2. Quake M4.5+ within ~300 mi (480 km) of home
   S.quakes.filter(q=>!q.mock&&q.mag>=4.5&&haversine(h.lat,h.lon,q.lat,q.lon)<=480).forEach(q=>{
@@ -2136,11 +2004,7 @@ function checkNotifRules(){
   // 3. Strong geomagnetic storm
   if(S.kp&&S.kp.v>=6){const id="kp:"+new Date().toISOString().slice(0,13);
     if(!notified.has(id)){rememberNotified(id);notify("Geomagnetic storm Kp "+S.kp.v.toFixed(1),"Watch condition — possible GPS/HF effects. MEASURED (NOAA SWPC)");}}
-  // 4. Recent lightning within 10 mi of home (only when focused location is home, because this keyed query follows focus)
-  if(Math.abs(S.loc.lat-h.lat)<0.01&&Math.abs(S.loc.lon-h.lon)<0.01)S.lightning.filter(x=>!x.mock&&x.distanceKm<=16.1&&x.pastMins<=10).forEach(x=>{
-    const id="l:"+(x.id||x.t+":"+x.lat.toFixed(3)+","+x.lon.toFixed(3));if(!notified.has(id)){rememberNotified(id);
-      notify("Recent lightning near home",`${(x.distanceKm*0.621371).toFixed(1)} mi away · ${x.pastMins.toFixed(1)} min ago · ${x.source||"lightning provider"} · flash may be in-cloud`);}});
-  // 5. Fire detection within ~50 mi (80 km) of home
+  // 4. Fire detection within ~50 mi (80 km) of home
   S.fires.filter(f=>!f.mock&&haversine(h.lat,h.lon,f.lat,f.lon)<=80).forEach(f=>{
     const id="f:"+f.lat.toFixed(2)+","+f.lon.toFixed(2)+":"+(f.when||"");
     if(!notified.has(id)){rememberNotified(id);
@@ -2155,7 +2019,7 @@ function setNotif(on){
   notifOn=on;store.set("notifOn",notifOn);$("btnNotif").classList.toggle("on",notifOn);}
 $("btnNotif").addEventListener("click",()=>setNotif(!notifOn));
 
-function renderAll(){renderBrief();renderAnomalies();renderTab();renderLayerList();renderBaMini();renderLightningMini();}
+function renderAll(){renderBrief();renderAnomalies();renderTab();renderLayerList();renderBaMini();}
 async function runAll(force){
   if(S.mock){renderAll();return;}
   await Promise.allSettled(Object.keys(ADAPTERS).map(id=>runAdapter(id,force)));
@@ -2166,7 +2030,8 @@ setInterval(watchdogSweep,30000);
 setInterval(()=>runAll(false),20000);
 setInterval(()=>{if(map.getSource("night"))gj("night");},120000);
 /* boot */
-renderLayerList();renderTab();renderLightningMini();watchdogSweep();
+ledger("Sentinel Globe","","v2 started · MapLibre globe · no telemetry","OK","OFFICIAL","3 files, all vendored, auditable");
+renderLayerList();renderTab();watchdogSweep();
 /* ---- Views: globe / polar top-down (azimuthal perspective, honestly derived from the globe) ---- */
 let viewMode="globe";
 /* ---- Shared orientation. Polar geometry: north at the view center points toward the pole,
@@ -2620,8 +2485,6 @@ function drawAE(){
     g.strokeStyle="#ff5a6e";g.lineWidth=2;g.beginPath();g.arc(x,y,Math.max(3,(q.mag||3)),0,7);g.stroke();});
   if(LAYERS.fires&&LAYERS.fires.on)S.fires.forEach(f=>{const[x,y]=aeXY(f.lat,f.lon,cx,cy,R);if(!vis(x,y))return;
     g.fillStyle="#e07a4b";g.fillRect(x-2,y-2,4,4);});
-  if(LAYERS.lightning&&LAYERS.lightning.on)S.lightning.forEach(x=>{const[px,py]=aeXY(x.lat,x.lon,cx,cy,R);if(!vis(px,py))return;
-    g.fillStyle=x.pastMins<=5?"#ff496c":x.pastMins<=15?"#ffb84d":"#ffe56b";g.beginPath();g.arc(px,py,3.2,0,7);g.fill();});
   if(LAYERS.alerts&&LAYERS.alerts.on)alertPoints().forEach(a=>{const[x,y]=aeXY(a.lat,a.lon,cx,cy,R);if(!vis(x,y))return;
     g.fillStyle="#e0b24b";g.beginPath();g.moveTo(x,y-5);g.lineTo(x+5,y+4);g.lineTo(x-5,y+4);g.closePath();g.fill();});
   if(LAYERS.ba&&LAYERS.ba.on)Object.values(S.ba).forEach(b=>{if(!b.lon)return;const[x,y]=aeXY(b.lat,b.lon,cx,cy,R);if(!vis(x,y))return;
@@ -2667,7 +2530,7 @@ document.addEventListener("click",e=>{if(e.target.closest("#btnAELab")){
   aeOpen?setView("globe",{keepCam:true}):setView("polar");}});
 
 /* ---- boot: bookmarks, presets, startup profile ---- */
-ledger("Boot","","Sentinel Globe v"+APP_VERSION+" started","OK","OFFICIAL","version derives from one constant; local libraries and GeoJSON are vendored in this deployment bundle");
+ledger("Boot","","Sentinel Globe v"+APP_VERSION+" started","OK","OFFICIAL","tab title and header badge both derive from this one constant");
 renderBookmarks();renderPresets();
 map.on("load",()=>{const boot=store.get("startup","");
   if(boot){const p=store.get("presets",{})[boot];
