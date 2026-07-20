@@ -1,45 +1,39 @@
-# Release Notes — v10.2.0 Weather Core
+# Release Notes — v10.1.2
 
-## Weather operating mode
+## Correctness fixes
 
-- Added **☁ WX** mode that focuses the interface on radar, lightning, alerts, and county context.
-- Preserves the user’s previous layer state and restores it when Weather Core closes.
-- Added a dedicated Weather tab with measured station observation, model nowcast, official alerts, 12-hour forecast, and lightning intelligence.
+- Fixed invalid EIA interchange geometry caused by treating coordinate arrays as objects.
+- Fixed grid anomaly cards that attempted to navigate to undefined coordinates.
+- Labeled Open-Meteo nowcast/forecast as MODELED and NWS station readings as MEASURED.
+- Rejected impossible raw and imported latitude/longitude values.
+- Added safe fallback for corrupted/unknown basemap values.
+- Hardened backup import size and field validation.
 
-## Radar engine
+## Interface and persistence fixes
 
-- Added timeline scrubbing, previous/next frame controls, three playback speeds, and clearer pause/play state.
-- Added smoother crossfades and next-frame priming.
-- Improved archive-span handling and explicit experimental labeling for archive gaps.
-- Added an extended hold on the latest frame so the loop is easier to read.
+- Saved basemap, orbit speed, and performance mode now restore on reload.
+- Fixed the Views/Polar help button.
+- Removed invalid nested Follow ISS button markup.
+- Replaced unsupported Watchdog `gray` state with `off`.
+- Removed redundant Follow ISS drag listener and noisy false release records.
+- Removed the nonfunctional “press GO again” instruction.
+- Added `noopener` to the static attribution link.
 
-## Lightning
+## Deployment and documentation
 
-- Added optional Weatherbit Current Lightning integration with configurable 25/50/75 km radius and 15/30/45 minute lookback.
-- Added age-colored map points, query-radius ring, popup provenance, nearest distance, returned-count metrics, recent activity trend, and cautious closer/farther distance trend.
-- Added NOAA GOES-19 GLM Flash Extent Density as an official no-key cross-check.
-- Added lightning to Polar view, Mock mode, Watchdog/feed status, Truth Ledger, source registry, local brief, anomaly engine, and notifications.
-- Explicitly distinguishes a lightning flash/detection from a proven cloud-to-ground strike.
-
-## Home-watch correctness
-
-- NWS home alerts are now fetched independently from the currently viewed location.
-- Duplicate current/home/national alerts merge their scope flags rather than silently losing the home designation.
-- Navigation immediately clears old location-scoped weather, station, lightning, fire, and local-alert state before fetching the new location.
-
-## Forecast improvements
-
-- Expanded hourly model data to include weather code, precipitation amount, wind, and gusts.
-- Set precipitation units explicitly to inches.
+- Replaced obsolete v1/v2 documentation with v10.1.2 documentation.
+- Added proper 192px and 512px application icons.
+- Added `.nojekyll`, a dependency-free static audit, and a deployment checklist.
+- Preserved older HTML builds under `archive/`.
 
 ## Verification status
 
-- Node JavaScript syntax check: passed.
-- Dependency-free static audit: passed.
-- Unique static HTML IDs: passed.
-- Nested-button check: passed.
-- Manifest and all three GeoJSON files: passed.
-- Local asset and help-reference checks: passed.
-- Dependency-free mocked runtime smoke test: passed through top-level boot, map-load callbacks, Weather Core entry/exit, radar stepping, and Mock mode.
+- JavaScript syntax: passed with Node `--check`.
+- Manifest JSON: passed.
+- GeoJSON parsing: passed for counties, faults, and world datasets.
+- Duplicate IDs: none.
+- Nested buttons: none.
+- Static help references: complete.
+- Local referenced assets: present.
 
-This execution environment blocks Chromium from opening even localhost/file URLs, so the final live network/browser test must be performed after GitHub Pages deployment with `DEPLOYMENT_CHECKLIST.md`.
+A live browser/network smoke test is still required after deployment because this execution environment blocks browser access to local and external sites and cannot validate provider CORS or live schema responses.

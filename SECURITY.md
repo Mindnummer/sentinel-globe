@@ -1,30 +1,35 @@
-# Security Notes — Sentinel Globe v10.2.0
+# Security Notes — Sentinel Globe v10.1.2
 
 ## Current posture
 
-- Static GitHub Pages application with read-only public-data requests and an optional AIS websocket.
-- No analytics, ads, tracking pixels, cookies, microphone, camera, WebRTC, `eval`, `new Function`, or dynamic remote script injection in the application source.
-- MapLibre GL and satellite.js are vendored locally.
-- Backup import is size-limited and validates sensitive location and key-bearing fields before application.
-- External strings are escaped before HTML rendering.
+- Static GitHub Pages application; no application server and no write access to remote systems.
+- No analytics package, advertising SDK, tracking pixel, cookie-based profile, microphone, camera, or WebRTC feature in the application source.
+- MapLibre GL and satellite.js are vendored local dependencies. Their exact shipped files should be preserved and reviewed when upgraded.
+- All telemetry operations are read-only requests to public-data providers, plus the optional AIS websocket.
+- Imported Sentinel backup files are size-limited and validated before applying location, basemap, bookmark, and custom-key fields.
 
 ## API keys
 
-Keys are stored in browser `localStorage`, which is **not encrypted**. They are transmitted over HTTPS/WSS only to the associated provider, but query-string keys can appear in browser/network logs.
+Keys are stored in browser `localStorage`, not in the repository. They leave the browser only when sent over HTTPS/WSS to the corresponding provider.
 
-Use only revocable, rate-limited public-data keys. Weatherbit access may be paid or plan-restricted; do not place a high-value unrestricted key in the public static client. Valuable secrets belong behind a trusted server relay.
+Important limits:
 
-## Weather data safety boundary
+- `localStorage` is not encrypted.
+- Any JavaScript running on the same site origin could read it.
+- A browser extension, compromised device, or future same-origin script could expose it.
+- Use only revocable, rate-limited public-data keys here.
+- Paid or high-value secrets belong behind a server-side relay and must never be placed in this static app.
 
-- The app does not represent every lightning flash as a ground strike.
-- Derived trends are labeled and are not official warnings.
-- Notifications are convenience signals, not a life-safety replacement.
-- Home NWS alerts are independently fetched to avoid confusing the current map focus with the home watch zone.
+## Untrusted data handling
 
-## Public infrastructure boundary
+The application escapes external strings before rendering them into HTML templates. It does not use `eval`, `new Function`, dynamic remote script injection, or raw external HTML. This release also removes invalid nested-button markup and validates coordinates before navigation/import.
 
-Sentinel does not scan, probe, write to, or control any infrastructure. It does not claim private SCADA access or infer private vulnerabilities.
+This is a source review, not a formal penetration test. A production public service should add automated dependency checks, browser integration tests, security headers at an edge host, and a server-side key boundary.
 
-## Verification boundary
+## Public-infrastructure boundary
 
-Static review is not a penetration test. A larger public deployment should add a backend key boundary, CSP/security headers at an edge host, dependency monitoring, schema-contract tests, and automated real-browser tests.
+Sentinel displays lawful public map and telemetry data. It does not scan networks, probe devices, modify infrastructure, claim access to private SCADA, or infer private vulnerability data.
+
+## Reporting a problem
+
+Document the version shown in the header, the browser and operating system, the exact steps, the Watchdog/feed-chip message, and any console error. Do not include API keys in screenshots or reports.

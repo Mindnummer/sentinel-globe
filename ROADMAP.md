@@ -1,56 +1,47 @@
 # Sentinel Globe — Truth-First Roadmap
 
-## v10.2.0 — Weather Core delivered
+## Release 10.1.2 — stabilization delivered
 
-- Focused WX mode with layer-state restoration
-- Fluid radar timeline, scrubber, stepping, speed control, crossfade, and archive spans
-- Optional recent point-lightning feed with age, radius, nearest distance, activity trend, and range trend
-- Official NOAA GLM visual cross-check
-- Weather desk reconciling measured station, modeled nowcast/forecast, and official alerts
-- Independent home-alert fetch and corrected home notification scope
-- Location-state clearing to prevent cross-location data contamination
+- Corrected EIA power-flow geometry and grid-anomaly navigation coordinates
+- Restored saved basemap, orbit-speed, and performance preferences
+- Validated saved/imported coordinates and basemap values
+- Corrected modeled-versus-measured weather labeling
+- Removed duplicate IDs, duplicate help key behavior, invalid nested buttons, dead Polar help, and invalid Watchdog states
+- Removed obsolete v2 boot metadata and misleading search instructions
+- Added proper install icons, `.nojekyll`, current documentation, a static audit, deployment checklist, and release notes
 
-## v10.2.x — hardening
+## Next release — Weather Core
 
-1. Live-browser test across Chrome, Edge, Firefox, Android, and iPhone/Safari.
-2. Add provider schema-contract tests and a visible response-shape failure reason.
-3. Add radar missing-frame detection rather than relying only on blank-tile observation.
-4. Add memory/network budget controls for weak phones.
-5. Add keyboard and screen-reader labels for every Weather Core control.
-6. Add a user-visible “last verified” timestamp for each weather card.
+Highest-value work before adding more unrelated telemetry:
 
-## v10.3 — Storm Intelligence
+1. **Unified weather timeline** — one scrubber controlling radar, lightning, alerts, observations, and forecast context.
+2. **Lightning layer** — flash locations colored by age; nearest flash; counts inside configurable radii/time windows; approaching/retreating trend; source age and coverage always visible.
+3. **Fluid radar engine** — frame preloading, cancellation, memory budget, missing-frame detection, smooth interpolation only when explicitly labeled, and station/product selection where lawful data supports it.
+4. **Storm-cell intelligence** — identify and track cells, motion vector, hail/wind/rotation evidence, uncertainty cone, and estimated arrival range rather than a false precise time.
+5. **Family Watch Zones** — multiple named locations, per-hazard thresholds, quiet hours, escalation rules, and deduplication.
+6. **“What changed?” briefing** — compare the current evidence state with the last verified snapshot.
+7. **Weather-source reconciliation** — measured station vs model nowcast vs official forecast, with disagreement highlighted instead of averaged away.
 
-1. Storm-cell identification from defensible radar products, not visual guesswork.
-2. Cell motion vectors and uncertainty cones.
-3. Hail, wind, and rotation evidence shown separately from official warning language.
-4. Arrival **ranges**, never false single-minute precision.
-5. Spatial lightning trend using cell-relative motion, beyond the current local median-distance comparison.
-6. NEXRAD station/product selection, including velocity where lawful browser access is stable.
+## Backend boundary
 
-## v10.4 — Family Watch Zones
+The weather system should gain a small trusted backend when lightning and historical intelligence are introduced. Its jobs:
 
-- Multiple named locations with independent alert, lightning, wind, flood, and fire thresholds
-- Quiet hours and escalation rules
-- Deduplication across zones
-- “What changed since I last checked?” evidence briefing
-- Explicit offline/stale state
+- Convert large/raw official products into efficient map tiles or vector events
+- Keep provider keys and tokens off public clients
+- Maintain durable history and replay
+- Deduplicate alerts and deliver background push notifications
+- Record immutable provenance, retrieval time, processing version, and checksums
 
-## Trusted backend boundary
+The browser remains the presentation and investigation client. The backend must not invent conclusions; it stores evidence and runs inspectable transforms.
 
-A small user-controlled backend should eventually:
+## Later intelligence modules
 
-- Keep valuable provider credentials off the public browser
-- Convert raw NOAA GLM/MRMS/NEXRAD products into efficient tiles/events
-- Store durable history and replay with checksums and processing version
-- Deliver background push notifications while the browser is closed
-- Monitor provider schema changes
-- Run inspectable transforms without inventing causes
-
-## Later modules
-
-Air quality/smoke, river/flood gauges, local storm reports, tropical systems, tsunami, volcano, drought, road conditions, power outages, offline app shell, modular TypeScript build, and storage on the user’s own Proxmox server.
+- Air quality, smoke transport, flood/river gauges, storm reports, tsunami, volcano, drought, and tropical products
+- Offline app shell and last-known-state display with unmistakable stale/offline labeling
+- Automated cross-browser tests and schema-contract tests
+- Modular source files or TypeScript build once feature velocity makes the single-file architecture a liability
+- Durable history on the user’s own Proxmox/server, with exportable open formats
 
 ## Standing integrity rules
 
-No fabricated data. No unlabeled mock data. No certainty outside an official product. No silent source substitution. Every derived claim exposes inputs, age, uncertainty, and what could disprove it.
+No faked data. No unlabeled mock data. No certainty language outside an official product. No silent source substitution. No private-infrastructure claims. No scanning or probing. Every derived finding must expose its inputs, age, confidence, and what would disprove it.

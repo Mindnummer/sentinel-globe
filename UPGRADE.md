@@ -1,14 +1,27 @@
-# Upgrade to Sentinel Globe v10.2.0
+# Upgrade to Sentinel Globe v10.1.2
 
-1. In the live app, use **Settings → Export FULL backup**.
-2. Download a ZIP backup of the current GitHub repository.
-3. Extract the v10.2.0 release ZIP.
-4. Upload everything inside `sentinel-globe-v10.2.0` to the repository root, replacing matching files.
-5. Commit as `Release Sentinel Globe v10.2.0 Weather Core`.
-6. Wait for GitHub Pages, hard-refresh once, and complete `DEPLOYMENT_CHECKLIST.md`.
+## Before replacing anything
 
-The release keeps the existing `sg2_` browser-storage namespace, so previous settings and keys remain in the same browser. Weatherbit is a new optional key field.
+1. Open the current app and use **Settings → FULL backup**.
+2. Save a ZIP of the current GitHub repository.
+3. Keep your API keys outside screenshots and commits.
+
+## Replace the GitHub Pages bundle
+
+1. Extract the v10.1.2 release ZIP on your computer.
+2. Open the `sentinel-globe-v10.1.2` folder.
+3. In the GitHub repository, choose **Add file → Upload files**.
+4. Drag the entire contents of the release folder into the repository root.
+5. Confirm that `index.html`, the three GeoJSON files, MapLibre files, satellite.js, manifest, icons, documentation, `.nojekyll`, `tests/`, and `archive/` are present.
+6. Commit with a clear message such as `Release Sentinel Globe v10.1.2 stabilization`.
+7. Wait for GitHub Pages to deploy.
+8. Open the site and perform one hard refresh with **Ctrl+Shift+R**.
+9. Complete `DEPLOYMENT_CHECKLIST.md`.
 
 ## Rollback
 
-`archive/index-v10.1.2-stable.html` is the immediate code rollback. Copy it to `index.html`, commit, and deploy. The complete pre-upgrade repository ZIP remains the strongest rollback.
+The release includes `archive/index-v10.1-original.html`. To restore the pre-audit application temporarily, download that file, rename the copy to `index.html`, upload it to the repository root, and commit. Keep the complete pre-upgrade repository ZIP as the stronger rollback method.
+
+## Browser-local settings
+
+The release keeps the same `sg2_` localStorage namespace, so ordinary settings and keys should remain in the same browser. The restored-preference fixes mean saved basemap, orbit speed, and performance mode now survive reloads.

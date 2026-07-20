@@ -1,58 +1,43 @@
-# Sentinel Globe v10.2.0 — Deployment Checklist
+# Sentinel Globe v10.1.2 — Deployment Checklist
 
-## Identity and boot
+Complete this in a normal desktop browser after GitHub Pages finishes deploying.
 
-- [ ] Header shows `v10.2.0 · PUBLIC TELEMETRY`
-- [ ] Browser title contains `Sentinel Globe v10.2.0`
-- [ ] No 404 for local JS/CSS, manifest, icons, or GeoJSON files
-- [ ] Globe loads and all three views work
-- [ ] DevTools Console has no uncaught red errors
+## Identity and local assets
 
-## Weather Core
+- [ ] Header shows `v10.1.2 · PUBLIC TELEMETRY`
+- [ ] Browser tab title contains `Sentinel Globe v10.1.2`
+- [ ] No 404 errors for MapLibre, satellite.js, manifest, icons, counties, faults, or world GeoJSON
+- [ ] Globe renders and can zoom, pitch, rotate, and switch basemaps
 
-- [ ] Press **☁ WX**; WEATHER tab opens and unrelated layers temporarily hide
-- [ ] Press **☁ WX** again; prior layer states return
-- [ ] Model card is labeled MODELED and NWS station card MEASURED
-- [ ] NWS alerts card is OFFICIAL
-- [ ] Next-12-hour table displays temperature, precipitation, wind, and gusts
-- [ ] Changing location immediately removes the old location’s weather/lightning points while new data loads
+## View continuity
 
-## Radar
+- [ ] Search `76234`; all three views preserve the selected location
+- [ ] Globe → Flat World → Polar → Globe does not jump to an unrelated location
+- [ ] Right-drag/touch rotation behaves intentionally in each view
+- [ ] HOME returns to the saved coordinates
+- [ ] Manual drag, zoom, rotate, another view, HOME, or search releases Follow mode
 
-- [ ] Scrubber moves through all recent frames
-- [ ] Previous/next buttons move exactly one frame
-- [ ] 0.5×, 1×, and 2× playback work
-- [ ] Crossfade does not leave two opaque radar frames stacked
-- [ ] Latest frame pauses longer than intermediate frames
-- [ ] 3h/12h/24h/72h archive modes are labeled EXPERIMENTAL
-- [ ] Blank archive imagery is not interpreted as clear weather
+## Persistence
 
-## Lightning
+- [ ] Select a non-default basemap, change orbit speed, and choose LOW/HIGH performance
+- [ ] Reload; all three values persist
+- [ ] Bookmark and preset survive reload
+- [ ] FULL backup exports and reimports without console errors
 
-Without a Weatherbit key:
+## Weather and telemetry
 
-- [ ] Weather tab clearly says point locations require a key/eligible plan
-- [ ] NOAA GLM button opens the official GOES-19 view
+- [ ] NWS station row is labeled MEASURED when available
+- [ ] Open-Meteo row is labeled MODELED
+- [ ] Radar displays recent frames and the timestamp changes during playback
+- [ ] A missing archive frame is not represented as clear weather
+- [ ] Feed chips expose errors and official-source links
+- [ ] Watchdog contains no unexplained red condition
 
-With an eligible Weatherbit key:
+## Integrity and mobile
 
-- [ ] Feed chip turns green or gives an exact entitlement/rate error
-- [ ] Dashed radius ring follows the selected location
-- [ ] Radius and lookback selectors refetch data
-- [ ] Points are red ≤5 min, orange 6–15 min, yellow older
-- [ ] Popup says a flash may be in-cloud and does not claim ground strike
-- [ ] Nearest distance and activity/range trends update
-- [ ] Polar view displays the same lightning points
+- [ ] MOCK mode displays its large banner and never leaks into live mode
+- [ ] INTEGRITY mode hides mock/experimental/low-confidence findings as designed
+- [ ] Mobile width shows bottom navigation and one sheet at a time
+- [ ] No uncaught red errors in DevTools Console
 
-## Home-watch correctness
-
-- [ ] Set a non-home location; home NWS alerts still remain eligible for notification
-- [ ] Viewed-location alerts do not masquerade as home alerts
-- [ ] Lightning notification only operates when the lightning query is focused on home
-
-## Existing regression checks
-
-- [ ] HOME, search, bookmarks, presets, backup import/export, Mock, Integrity, Orbit, Focus, Follow ISS, basemaps, mobile sheets, and Watchdog still work
-- [ ] Reload preserves basemap, orbit speed, performance, keys, and settings
-
-Record any failure with browser/OS, exact steps, screenshot, Console text, request URL/status, and feed-chip message—never include API keys.
+Record failures with browser version, screenshot, Console text, Network request URL/status, and the relevant feed-chip message.
